@@ -1,54 +1,55 @@
-import { BleClient } from '@capacitor-community/bluetooth-le';
-import CBOR from 'cbor2';
+import {BleClient} from '@capacitor-community/bluetooth-le';
+import CBOR from 'cbor';
 
 class DVBDeviceBLE {
-  constructor(di = {}) {
-    this._isConnected = false;
-    this._reconnectAttempts = 0;
-    this._maxReconnectAttempts = 5;
 
-    // MTU
-    this.SERVICE_UUID = '8d53dc1d-1db7-4cd3-868b-8a527460aa84';
-    this.CHARACTERISTIC_UUID = 'da2e7828-fbce-4e01-ae9e-261174997c48';
-    this._mtu = 140;
-    this._device = null;
-    this._service = null;
-    this._characteristic = null;
-    this._connectCallback = null;
-    this._connectingCallback = null;
-    this._disconnectCallback = null;
-    this._messageCallback = null;
-    this._imageUploadProgressCallback = null;
-    this._uploadIsInProgress = false;
-    this._buffer = new Uint8Array();
-    this._logger = di.logger || { info: console.log, error: console.error };
-    this._seq = 0;
-    this._userRequestedDisconnect = false;
+  private isConnected = false;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
 
-    // DVB
-    this._serviceDVB = null;
-    this._servceInfo = null;
-    this.listOfFiles = [];
-    this.shortname = null;
-    this.serialNumber = null;
-    this.firmwareVersion = null;
-    this.hardwareVersion = null;
-    this.DEVICE_INFORMATION_SERVICE_UUID =
-      '0000180a-0000-1000-8000-00805f9b34fb';
-    this.SERIAL_NUMBER_UUID = 'dbd00003-ff30-40a5-9ceb-a17358d31999';
-    this.DVB_SERVICE_UUID = 'dbd00001-ff30-40a5-9ceb-a17358d31999';
-    this.LIST_FILES_UUID = 'dbd00010-ff30-40a5-9ceb-a17358d31999';
-    this.SHORTNAME_UUID = 'dbd00002-ff30-40a5-9ceb-a17358d31999';
-    this.WRITE_TO_DEVICE_UUID = 'dbd00011-ff30-40a5-9ceb-a17358d31999';
-    this.READ_FROM_DEVICE_UUID = 'dbd00012-ff30-40a5-9ceb-a17358d31999';
-    this.FORMAT_STORAGE_UUID = 'dbd00013-ff30-40a5-9ceb-a17358d31999';
-    this.FIRMWARE_REVISION_UUID = '00002a26-0000-1000-8000-00805f9b34fb';
-    this.HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';
-  }
+  // MTU
+  private SERVICE_UUID = '8d53dc1d-1db7-4cd3-868b-8a527460aa84';
+  private CHARACTERISTIC_UUID = 'da2e7828-fbce-4e01-ae9e-261174997c48';
+  private mtu = 140;
+  private device:any = null;
+  private service = null;
+  private characteristic = null;
+  private connectCallback = null;
+  private connectingCallback = null;
+  private disconnectCallback = null;
+  private messageCallback = null;
+  private imageUploadProgressCallback = null;
+  private imageUploadFinishedCallback = null;
+  private uploadIsInProgress = false;
+  private buffer = new Uint8Array();
+  private logger = { info: console.log, error: console.error };
+  private seq = 0;
+  private userRequestedDisconnect = false;
 
-  async _requestDevice(filters) {
+  // DVB
+  private serviceDVB = null;
+  private serviceInfo = null;
+  private listOfFiles = [];
+  private shortname = null;
+  private serialNumber = null;
+  private firmwareVersion = null;
+  private hardwareVersion = null;
+
+  // Serials
+  private DEVICE_INFORMATION_SERVICE_UUID = '0000180a-0000-1000-8000-00805f9b34fb';
+  private SERIAL_NUMBER_UUID = 'dbd00003-ff30-40a5-9ceb-a17358d31999';
+  private DVB_SERVICE_UUID = 'dbd00001-ff30-40a5-9ceb-a17358d31999';
+  private LIST_FILES_UUID = 'dbd00010-ff30-40a5-9ceb-a17358d31999';
+  private SHORTNAME_UUID = 'dbd00002-ff30-40a5-9ceb-a17358d31999';
+  private WRITE_TO_DEVICE_UUID = 'dbd00011-ff30-40a5-9ceb-a17358d31999';
+  private READ_FROM_DEVICE_UUID = 'dbd00012-ff30-40a5-9ceb-a17358d31999';
+  private FORMAT_STORAGE_UUID = 'dbd00013-ff30-40a5-9ceb-a17358d31999';
+  private FIRMWARE_REVISION_UUID = '00002a26-0000-1000-8000-00805f9b34fb';
+  private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';  
+
+  private async requestDevice(filters:any) {
     if (Capacitor.isNativePlatform()) {
-      return this._requestMobileDevice(filters);
+      return this.requestMobileDevice(filters);
     } else {
       const params = {
         acceptAllDevices: true,
@@ -57,6 +58,7 @@ class DVBDeviceBLE {
           this.DVB_SERVICE_UUID,
           this.DEVICE_INFORMATION_SERVICE_UUID,
         ],
+        filters: []
       };
       if (filters) {
         params.filters = filters;
@@ -66,7 +68,7 @@ class DVBDeviceBLE {
     }
   }
 
-  async _requestMobileDevice(filters) {
+  private async requestMobileDevice(filters:any) {
     const params = {
       services: [
         this.SERVICE_UUID,
@@ -74,6 +76,7 @@ class DVBDeviceBLE {
         this.DEVICE_INFORMATION_SERVICE_UUID,
       ],
       allowDuplicates: false,
+      name: '',
     };
     if (filters && filters.length > 0) {
       params.name = filters[0].name;
@@ -99,10 +102,10 @@ class DVBDeviceBLE {
 
   async connect(filters) {
     try {
-      this._device = await this._requestDevice(filters);
+      this.device = await this.requestDevice(filters);
 
-      this._logger.info(
-        `Connecting to device ${this._device.name || this._device.deviceId}...`
+      this.logger.info(
+        `Connecting to device ${this.device.name || this.device.deviceId}...`
       );
 
       if (Capacitor.isNativePlatform()) {
