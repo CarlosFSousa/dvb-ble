@@ -1,5 +1,10 @@
 import {BleClient} from '@capacitor-community/bluetooth-le';
+import { Capacitor } from '@capacitor/core';
 import CBOR from 'cbor';
+
+type filters = {
+  name: string;
+}
 
 class DVBDeviceBLE {
 
@@ -12,10 +17,10 @@ class DVBDeviceBLE {
   private CHARACTERISTIC_UUID = 'da2e7828-fbce-4e01-ae9e-261174997c48';
   private mtu = 140;
   private device:any = null;
-  private service = null;
-  private characteristic = null;
+  private service:any = null;
+  private characteristic:any = null;
   private connectCallback = null;
-  private connectingCallback = null;
+  private connectingCallback:any = null;
   private disconnectCallback = null;
   private messageCallback = null;
   private imageUploadProgressCallback = null;
@@ -47,7 +52,7 @@ class DVBDeviceBLE {
   private FIRMWARE_REVISION_UUID = '00002a26-0000-1000-8000-00805f9b34fb';
   private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';  
 
-  private async requestDevice(filters:any) {
+  private async requestBrowserDevice(filters) {
     if (Capacitor.isNativePlatform()) {
       return this.requestMobileDevice(filters);
     } else {
@@ -68,7 +73,7 @@ class DVBDeviceBLE {
     }
   }
 
-  private async requestMobileDevice(filters:any) {
+  private async requestMobileDevice(filters) {
     const params = {
       services: [
         this.SERVICE_UUID,
@@ -102,64 +107,43 @@ class DVBDeviceBLE {
 
   async connect(filters) {
     try {
-      this.device = await this.requestDevice(filters);
-
-      this.logger.info(
-        `Connecting to device ${this.device.name || this.device.deviceId}...`
-      );
-
+      this.device = await this.requestBrowserDevice(filters);
+      this.logger.info(`Connecting to device ${this.device.name || this.device.deviceId}...`);
+  
       if (Capacitor.isNativePlatform()) {
-        await BleClient.connect(this._device.deviceId);
-        this._logger.info(
-          `Connected to device ${this._device.name || this._device.deviceId}`
-        );
+        await BleClient.connect(this.device.deviceId);
+        this.logger.info(`Connected to device ${this.device.name || this.device.deviceId}`);
       } else {
-        this._device.addEventListener(
+        this.device.addEventListener(
           'gattserverdisconnected',
           this._handleDisconnect.bind(this)
         );
       }
-
-      await this._connect();
-    } catch (error) {
-      this._logger.error(`Connection error: ${error.message}`);
-      await this._disconnected();
-      throw error;
-    }
-  }
-
-  async _connect() {
-    try {
-      if (this._connectingCallback) this._connectingCallback();
-
+  
+      if (this.connectingCallback) this.connectingCallback();
+  
       if (!Capacitor.isNativePlatform()) {
-        const server = await this._device.gatt.connect();
-        this._logger.info(`Server connected.`);
-        this._service = await server.getPrimaryService(this.SERVICE_UUID);
+        const server = await this.device.gatt.connect();
+        this.logger.info('Server connected.');
+        this.service = await server.getPrimaryService(this.SERVICE_UUID);
       }
-
-      this._logger.info(`Service connected.`);
-      this._isConnected = true;
-
+  
+      this.logger.info('Service connected.');
+      this.isConnected = true;
+  
       try {
         if (!Capacitor.isNativePlatform()) {
-          this._serviceDVB = await this._device.gatt.getPrimaryService(
-            this.DVB_SERVICE_UUID
-          );
-          this._serviceInfo = await this._device.gatt.getPrimaryService(
-            this.DEVICE_INFORMATION_SERVICE_UUID
-          );
+          this.serviceDVB = await this.device.gatt.getPriaryService(this.DVB_SERVICE_UUID);
+          this.serviceInfo = await this.device.gatt.getPrimaryService(this.DEVICE_INFORMATION_SERVICE_UUID);
         }
         await this.setDeviceInfo();
-      } catch (error) {
-        this._logger.info(
-          `DVB-specific services not available: ${error.message}`
-        );
+      } catch (error: any) {
+        this.logger.info(`DVB-specific services not available: ${error.message}`);
       }
-
+  
       if (Capacitor.isNativePlatform()) {
         await BleClient.startNotifications(
-          this._device.deviceId,
+          this.device.deviceId,
           this.SERVICE_UUID,
           this.CHARACTERISTIC_UUID,
           (value) => {
@@ -167,26 +151,25 @@ class DVBDeviceBLE {
           }
         );
       } else {
-        this._characteristic = await this._service.getCharacteristic(
-          this.CHARACTERISTIC_UUID
-        );
-        this._characteristic.addEventListener(
+        this.characteristic = await this.service.getCharacteristic(this.CHARACTERISTIC_UUID);
+        this.characteristic.addEventListener(
           'characteristicvaluechanged',
           this._notification.bind(this)
         );
-        await this._characteristic.startNotifications();
+        await this.characteristic.startNotifications();
       }
-
+  
       await this._connected();
-      if (this._uploadIsInProgress) {
+      if (this.uploadIsInProgress) {
         this._uploadNext();
       }
-    } catch (error) {
-      this._logger.error(`Connection error: ${error.message}`);
-      this._isConnected = false;
+    } catch (error: any) {
+      this.logger.error(`Connection error: ${error.message}`);
+      this.isConnected = false;
+      await this._disconnected();
       throw error;
     }
-  }
+  } 
 
   async setDeviceInfo() {
     if (!this._isConnected) {

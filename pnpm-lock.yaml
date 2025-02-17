@@ -11,6 +11,9 @@ importers:
       '@capacitor-community/bluetooth-le':
         specifier: ^7.0.0
         version: 7.0.0(@capacitor/core@7.0.1)
+      '@capacitor/core':
+        specifier: ^7.0.1
+        version: 7.0.1
       cbor:
         specifier: ^10.0.3
         version: 10.0.3
