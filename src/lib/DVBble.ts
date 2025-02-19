@@ -2,7 +2,7 @@ import {BleClient} from '@capacitor-community/bluetooth-le';
 import { Capacitor } from '@capacitor/core';
 import CBOR from 'cbor';
 
-class DVBDeviceBLE {
+export default class DVBDeviceBLE {
 
   private isConnected = false;
   private reconnectAttempts = 0;
@@ -52,9 +52,6 @@ class DVBDeviceBLE {
   private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';  
 
   private async requestBrowserDevice(filters:any) {
-    if (Capacitor.isNativePlatform()) {
-      return this.requestMobileDevice(filters);
-    } else {
       const params = {
         acceptAllDevices: false,
         optionalServices: [
@@ -69,7 +66,7 @@ class DVBDeviceBLE {
         params.acceptAllDevices = false;
       }
       return navigator.bluetooth.requestDevice(params);
-    }
+
   }
 
   private async requestMobileDevice(filters:any) {
@@ -130,6 +127,10 @@ class DVBDeviceBLE {
       }else{
         try{
           this.device = await this.requestBrowserDevice(filters);
+          this.device.addEventListener(
+            'gattserverdisconnected',
+            this._handleDisconnect.bind(this)
+          );
           this.logger.info(`Connecting to device ${this.device.name || this.device.deviceId}...`);
 
           const server = await this.device.gatt.connect();
@@ -193,6 +194,7 @@ class DVBDeviceBLE {
       this.reconnectAttempts = 0;
       this._reconnect();
     } else {
+      console.log('User requested disconnect');
       await this._disconnected();
     }
   }
@@ -257,6 +259,7 @@ class DVBDeviceBLE {
   }
 
   async _connected() {
+    this.userRequestedDisconnect = false;
     if (this.connectCallback) this.connectCallback();
   }
 
@@ -269,7 +272,6 @@ class DVBDeviceBLE {
     this.serviceInfo = null;
     this.characteristic = null;
     this.uploadIsInProgress = false;
-    this.userRequestedDisconnect = false;
     this.serialNumber = null;
     this.listOfFiles = [];
   }
@@ -727,5 +729,3 @@ class DVBDeviceBLE {
     }
   }
 }
-
-export default DVBDeviceBLE;
