@@ -2,6 +2,7 @@
 
 import { APP_VERSION } from "@/version";
 import { usePathname } from "next/navigation"
+import Link from "next/link"
 import { useState } from "react"
 
 export default function Nav() {
@@ -19,7 +20,7 @@ export default function Nav() {
   return (
     <nav className="bg-white border-gray-200 dark:bg-gray-900">
       <div className="flex items-center justify-between p-4 mx-auto max-w-screen-xl">
-        <a href="/" className="text-2xl font-semibold whitespace-nowrap dark:text-white">DVB Ble Scanner v{APP_VERSION}</a>
+        <Link href="/" className="text-2xl font-semibold whitespace-nowrap dark:text-white">DVB Ble Scanner v{APP_VERSION}</Link>
         <button onClick={toggleMenu}
           data-collapse-toggle="navbar-default"
           type="button"
@@ -39,10 +40,10 @@ export default function Nav() {
                 md:bg-white dark:bg-gray-800
                  md:dark:bg-gray-900 dark:border-gray-700">
             <li>
-              <a href="/firmware" className={linkClass("/firmware")}>Firmware</a>
+              <Link href="/firmware" className={linkClass("/firmware")}>Firmware</Link>
             </li>
             <li>
-              <a href="/transfer" className={linkClass("/transfer")}>Transfer</a>
+              <Link href="/transfer" className={linkClass("/transfer")}>Transfer</Link>
             </li>
           </ul>
         </div>
