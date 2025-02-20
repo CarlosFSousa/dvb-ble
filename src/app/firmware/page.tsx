@@ -18,6 +18,8 @@ export default function Firmware() {
   const [hardware, setHardware] = useState("");
   const [tableRows, setTableRows] = useState<TableRow[]>([]);
   const [buttonLabel, setButtonLabel] = useState('Connect');
+  const [showModal, setShowModal] = useState(false);
+  const [fileData, setFileData] = useState<Uint8Array | any>(null);
 
   useEffect(() => {
     dvb.onDisconnect(() => {
@@ -31,7 +33,7 @@ export default function Firmware() {
     if(buttonLabel === "Connect") {
       toggleButton();
       await dvb.connect();
-      updateTable();
+      await updateTable();
     } else {
       toggleButton();
       await dvb.disconnect();
@@ -52,7 +54,7 @@ export default function Firmware() {
     const files = await dvb.getFileList();
     console.log(files)
     const newRows = files.map((file:TableRow) => {
-      const buttonDowload = (
+      const buttonDownload = (
         <button
           onClick={() => downloadFile(file.name)}
           className="border-4 border-green-500 p-2 rounded-md bg-green-600 text-white m-2"
@@ -63,7 +65,7 @@ export default function Firmware() {
       return {
         name: file.name,
         length: file.length,
-        actions: buttonDowload
+        actions: buttonDownload
       } as TableRow;
     })
     
@@ -72,8 +74,9 @@ export default function Firmware() {
   }
 
   const downloadFile = async (name: string) => {
-    const content = await dvb.getFileContent(name,()=>{});
-    console.log(content);
+    const content:any = await dvb.getFileContent(name, () => {});
+    setFileData(content);
+    setShowModal(true);
   }
 
   return <div className="flex flex-col">
@@ -83,18 +86,15 @@ export default function Firmware() {
       {buttonLabel}
     </button>
       {buttonLabel === "Disconnect" && tableRows.length > 0 ? (
-          <div className="flex-col flex items-baseline">
-            <label className="text-xl">Change Shortname</label>
-            <input className="border-2 border-black p-1"/>
-            <button className="border-4 p-2 rounded-md bg-yellow-500 text-white m-2">Format Device</button>
+          <div>
+            <div className="flex-col flex items-baseline">
+              <label className="text-xl">Change Shortname</label>
+              <input className="border-2 border-black p-1"/>
+              <button className="border-4 p-2 rounded-md bg-yellow-500 text-white m-2">Format Device</button>
+            </div>
           </div>
       ) : null
       }
-    {/*<div className={`${buttonLabel === "Disconnect" && tableRows.length > 0 ? "" : "hidden"} flex-col flex items-baseline`}>*/}
-    {/*  <label className="text-xl">Change Shortname</label>*/}
-    {/*  <input className="border-2 border-black p-1"/>*/}
-    {/*<button className="border-4 p-2 rounded-md bg-yellow-500 text-white m-2">Format Device</button>*/}
-    {/*</div>*/}
     </div>
     <table className="table-auto w-full border-collapse border border-gray-500">
       <thead className="bg-gray-100">
@@ -122,5 +122,20 @@ export default function Firmware() {
         )}
       </tbody>
     </table>
+    {showModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white p-4 w-3/4">
+      <h2 className="text-xl">File Content</h2>
+        <textarea
+            readOnly
+            className="border w-full h-64 p-2"
+            value={fileData ? fileData.toString() : ''}
+        />
+      <button onClick={() => setShowModal(false)}
+    className="border p-2 mt-2">Close
+    </button>
+  </div>
+</div>
+)}
   </div>
 }
