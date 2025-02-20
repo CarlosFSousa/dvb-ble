@@ -464,8 +464,7 @@ export default class DVBDeviceBLE {
             this.SHORTNAME_UUID
           );
           const value = await characteristic.readValue();
-          const shortName = new TextDecoder().decode(value);
-          this.shortname = shortName;
+          this.shortname = new TextDecoder().decode(value);
         } else {
           const characteristic = await this.serviceDVB.getCharacteristic(
             this.SHORTNAME_UUID

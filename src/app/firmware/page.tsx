@@ -19,6 +19,7 @@ export default function Firmware() {
   const [tableRows, setTableRows] = useState<TableRow[]>([]);
   const [buttonLabel, setButtonLabel] = useState('Connect');
   const [showModal, setShowModal] = useState(false);
+  const [fileName,setFileName] = useState("");
   const [fileData, setFileData] = useState<Uint8Array | any>(null);
 
   useEffect(() => {
@@ -75,8 +76,18 @@ export default function Firmware() {
 
   const downloadFile = async (name: string) => {
     const content:any = await dvb.getFileContent(name, () => {});
+    setFileName(name);
     setFileData(content);
     setShowModal(true);
+  }
+
+  const saveFile = (name:string) =>{
+    const file = new Blob([fileData]);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(file);
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   return <div className="flex flex-col">
@@ -133,6 +144,9 @@ export default function Firmware() {
         />
       <button onClick={() => setShowModal(false)}
     className="border p-2 mt-2">Close
+    </button>
+    <button onClick={() => saveFile(fileName)}
+        className="border p-2 mt-2">Download
     </button>
   </div>
 </div>
