@@ -38,10 +38,11 @@ export default class DVBDeviceBLE {
   private serialNumber:any = null;
   private firmwareVersion:any = null;
   private hardwareVersion:any = null;
+  private duDeviceUIDVersion: any;
 
   // Serials
   private DEVICE_INFORMATION_SERVICE_UUID = '0000180a-0000-1000-8000-00805f9b34fb';
-  private SERIAL_NUMBER_UUID = 'dbd00003-ff30-40a5-9ceb-a17358d31999';
+  private SERIAL_NUMBER_UUID = 'dbd00001-ff30-40a5-9ceb-a17358d31999';
   private DVB_SERVICE_UUID = 'dbd00001-ff30-40a5-9ceb-a17358d31999';
   private LIST_FILES_UUID = 'dbd00010-ff30-40a5-9ceb-a17358d31999';
   private SHORTNAME_UUID = 'dbd00002-ff30-40a5-9ceb-a17358d31999';
@@ -49,7 +50,8 @@ export default class DVBDeviceBLE {
   private READ_FROMdevice_UUID = 'dbd00012-ff30-40a5-9ceb-a17358d31999';
   private FORMAT_STORAGE_UUID = 'dbd00013-ff30-40a5-9ceb-a17358d31999';
   private FIRMWARE_REVISION_UUID = '00002a26-0000-1000-8000-00805f9b34fb';
-  private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';  
+  private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';
+  private DU_DEVICE_UID_UUID = 'dbd00003-ff30-40a5-9ceb-a17358d31999';
 
   private async requestBrowserDevice(filters:any) {
       const params = {
@@ -169,6 +171,10 @@ export default class DVBDeviceBLE {
           }
   }
 
+  getDeviceName() {
+    return this.device.name;
+  }
+
   async setDeviceInfo() {
     if (!this.isConnected) {
       this.logger.error('Device is not connected. Cannot set device info.');
@@ -181,6 +187,7 @@ export default class DVBDeviceBLE {
       await this.setSerialNumber();
       await this.setHardwareVersion();
       await this.setFirmwareVersion();
+      await this.setDUDeviceUID();
     } catch (error:any) {
       this.logger.error(`Error setting device info: ${error.message}`);
     }
@@ -525,91 +532,95 @@ export default class DVBDeviceBLE {
     }
   }
 
-  async getFileContent(name:string, progressCallback:Function) {
+  async getFileContent(name: string, progressCallback: Function) {
     try {
-      const arrayBuffers:any = [];
+      const arrayBuffers: any = [];
       let offset = 0;
       let totalSize = 0;
+      const CHUNK_SIZE = 65536;
 
-      const fileInfo = this.listOfFiles.find((file:any) => file.name === name);
+      const fileInfo = this.listOfFiles.find((file: any) => file.name === name);
       if (fileInfo) {
         totalSize = parseInt(fileInfo.length);
       }
 
-      const uf8encode = new TextEncoder();
-      const name_bytes:any = uf8encode.encode(`${name};${offset};`);
+      const utf8encoder = new TextEncoder();
 
       if (Capacitor.isNativePlatform()) {
-        await BleClient.write(
-          this.device.deviceId,
-          this.DVB_SERVICE_UUID,
-          this.WRITE_TOdevice_UUID,
-          name_bytes
-        );
-
         while (true) {
-          const display_info:any = await BleClient.read(
-            this.device.deviceId,
-            this.DVB_SERVICE_UUID,
-            this.READ_FROMdevice_UUID
-          );
-
-          if (display_info.byteLength !== 0) {
-            offset += display_info.byteLength;
-            this.logger.info(`Appending length to offset: ${offset}`);
-            const name_bytes:any = uf8encode.encode(`${name};${offset};`);
+          try {
+            const name_bytes: any = utf8encoder.encode(`${name};${offset};`);
             await BleClient.write(
-              this.device.deviceId,
-              this.DVB_SERVICE_UUID,
-              this.WRITE_TOdevice_UUID,
-              name_bytes
+                this.device.deviceId,
+                this.DVB_SERVICE_UUID,
+                this.WRITE_TOdevice_UUID,
+                name_bytes
             );
-            const array:any = new Uint8Array(display_info);
-            array.map((x:any) => {
-              arrayBuffers.push(x);
-            });
 
-            if (totalSize > 0 && progressCallback) {
-              const progress = Math.min(
-                100,
-                Math.round((offset / totalSize) * 100)
-              );
-              progressCallback(progress);
+            const display_info: any = await BleClient.read(
+                this.device.deviceId,
+                this.DVB_SERVICE_UUID,
+                this.READ_FROMdevice_UUID
+            );
+
+            if (display_info.byteLength !== 0) {
+              const array: any = new Uint8Array(display_info);
+              array.map((x: any) => arrayBuffers.push(x));
+
+              if (arrayBuffers.length % CHUNK_SIZE === 0) {
+                offset += CHUNK_SIZE;
+                this.logger.info(`Reached 64 KB, updating offset: ${offset}`);
+              }
+
+              if (totalSize > 0 && progressCallback) {
+                const progress = Math.min(100, Math.round((arrayBuffers.length / totalSize) * 100));
+                progressCallback(progress);
+              }
+            } else {
+              break;
             }
-          } else {
-            break;
+          } catch (error) {
+            this.logger.error(`Error reading data, retrying at offset ${offset}`, error);
+            await new Promise((resolve) => setTimeout(resolve, 500)); // Small delay before retrying
           }
         }
       } else {
-        const write_characteristic = await this.serviceDVB.getCharacteristic(
-          this.WRITE_TOdevice_UUID
-        );
-        const read_characteristic = await this.serviceDVB.getCharacteristic(
-          this.READ_FROMdevice_UUID
-        );
 
-        await write_characteristic.writeValue(name_bytes);
+        const write_characteristic = await this.serviceDVB.getCharacteristic(this.WRITE_TOdevice_UUID);
+        const read_characteristic = await this.serviceDVB.getCharacteristic(this.READ_FROMdevice_UUID);
+
         while (true) {
-          const display_info = await read_characteristic.readValue();
-          if (display_info.byteLength !== 0) {
-            offset += display_info.byteLength;
-            this.logger.info(`Appending length to offset: ${offset}`);
-            const name_bytes = uf8encode.encode(`${name};${offset};`);
-            await write_characteristic.writeValue(name_bytes);
-            const array:any = new Uint8Array(display_info.buffer);
-            array.map((x:any) => {
-              arrayBuffers.push(x);
-            });
-
-            if (totalSize > 0 && progressCallback) {
-              const progress = Math.min(
-                100,
-                Math.round((offset / totalSize) * 100)
-              );
-              progressCallback(progress);
+          try {
+            if (arrayBuffers.length % CHUNK_SIZE === 0) {
+              const name_bytes: any = utf8encoder.encode(`${name};${offset};`);
+              await write_characteristic.writeValue(name_bytes);
             }
-          } else {
-            break;
+
+            const display_info = await read_characteristic.readValue();
+
+            if (display_info.byteLength !== 0) {
+
+              const array = new Uint8Array(display_info.buffer);
+              arrayBuffers.push(...array);
+
+              if (arrayBuffers.length >= offset + CHUNK_SIZE) {
+                offset += CHUNK_SIZE;
+                this.logger.info(`Reached 64 KB, updating offset: ${offset}`);
+              }
+
+              console.log("totalSize",totalSize)
+              if (totalSize > 0 && progressCallback) {
+                const progress = Math.min(100, Math.round((arrayBuffers.length / totalSize) * 100));
+                console.log("progress inside",progress)
+                progressCallback(progress);
+              }
+
+            } else {
+              break;
+            }
+          } catch (error) {
+            this.logger.error(`Error reading data, retrying at offset ${offset}`, error);
+            await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
       }
@@ -619,6 +630,7 @@ export default class DVBDeviceBLE {
       this.logger.error(error);
     }
   }
+
 
   async formatStorage() {
     try {
@@ -724,6 +736,36 @@ export default class DVBDeviceBLE {
       }
     } catch (error) {
       this.logger.error('Error getting firmware version:', error);
+      throw error;
+    }
+  }
+
+  getDUDeviceUID() {
+    return this.duDeviceUIDVersion;
+  }
+
+  async setDUDeviceUID() {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const duDeviceUID = await BleClient.read(
+            this.device.deviceId,
+            this.DVB_SERVICE_UUID,
+            this.DU_DEVICE_UID_UUID
+        );
+        const duDeviceUIDString = new TextDecoder().decode(duDeviceUID);
+        this.logger.info('DUDeviceUID:', duDeviceUIDString);
+        this.duDeviceUIDVersion = duDeviceUIDString;
+      } else {
+        const characteristic = await this.serviceDVB.getCharacteristic(
+            this.DU_DEVICE_UID_UUID
+        );
+        const duDeviceUID = await characteristic.readValue();
+        const duDeviceUIDVersion = new TextDecoder().decode(duDeviceUID);
+        this.logger.info('DU Device UID Version:', duDeviceUIDVersion);
+        this.duDeviceUIDVersion = duDeviceUIDVersion;
+      }
+    } catch (error) {
+      this.logger.error("Error getting DUDeviceUID", error);
       throw error;
     }
   }
