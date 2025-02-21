@@ -1,4 +1,4 @@
-import {BleClient} from '@capacitor-community/bluetooth-le';
+import { BleClient } from '@capacitor-community/bluetooth-le';
 import { Capacitor } from '@capacitor/core';
 import CBOR from 'cbor';
 
@@ -12,16 +12,16 @@ export default class DVBDeviceBLE {
   private SERVICE_UUID = '8d53dc1d-1db7-4cd3-868b-8a527460aa84';
   private CHARACTERISTIC_UUID = 'da2e7828-fbce-4e01-ae9e-261174997c48';
   private mtu = 140;
-  private device:any = null;
-  private service:any = null;
-  private characteristic:any = null;
-  private connectCallback:any = null;
-  private connectingCallback:any = null;
-  private disconnectCallback:any = null;
-  private messageCallback:any = null;
-  private imageUploadProgressCallback:any = null;
-  private imageUploadFinishedCallback:any = null;
-  private uploadImage:any = null;
+  private device: any = null;
+  private service: any = null;
+  private characteristic: any = null;
+  private connectCallback: any = null;
+  private connectingCallback: any = null;
+  private disconnectCallback: any = null;
+  private messageCallback: any = null;
+  private imageUploadProgressCallback: any = null;
+  private imageUploadFinishedCallback: any = null;
+  private uploadImage: any = null;
   private uploadSlot = 0;
   private uploadOffset = 0;
   private uploadIsInProgress = false;
@@ -31,13 +31,13 @@ export default class DVBDeviceBLE {
   private userRequestedDisconnect = false;
 
   // DVB
-  private serviceDVB:any = null;
-  private serviceInfo:any = null;
-  private listOfFiles:any = [];
-  private shortname:any = null;
-  private serialNumber:any = null;
-  private firmwareVersion:any = null;
-  private hardwareVersion:any = null;
+  private serviceDVB: any = null;
+  private serviceInfo: any = null;
+  private listOfFiles: any = [];
+  private shortname: any = null;
+  private serialNumber: any = null;
+  private firmwareVersion: any = null;
+  private hardwareVersion: any = null;
   private duDeviceUIDVersion: any;
 
   // Serials
@@ -53,25 +53,25 @@ export default class DVBDeviceBLE {
   private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';
   private DU_DEVICE_UID_UUID = 'dbd00003-ff30-40a5-9ceb-a17358d31999';
 
-  private async requestBrowserDevice(filters:any) {
-      const params = {
-        acceptAllDevices: false,
-        optionalServices: [
-          this.SERVICE_UUID,
-          this.DVB_SERVICE_UUID,
-          this.DEVICE_INFORMATION_SERVICE_UUID,
-        ],
-        filters: filters || [{namePrefix: 'DVB'}],
-      };
-      if (filters) {
-        params.filters = filters;
-        params.acceptAllDevices = false;
-      }
-      return navigator.bluetooth.requestDevice(params);
+  private async requestBrowserDevice(filters: any) {
+    const params = {
+      acceptAllDevices: false,
+      optionalServices: [
+        this.SERVICE_UUID,
+        this.DVB_SERVICE_UUID,
+        this.DEVICE_INFORMATION_SERVICE_UUID,
+      ],
+      filters: filters || [{ namePrefix: 'DVB' }],
+    };
+    if (filters) {
+      params.filters = filters;
+      params.acceptAllDevices = false;
+    }
+    return navigator.bluetooth.requestDevice(params);
 
   }
 
-  private async requestMobileDevice(filters:any) {
+  private async requestMobileDevice(filters: any) {
     const params = {
       services: [
         this.SERVICE_UUID,
@@ -103,72 +103,72 @@ export default class DVBDeviceBLE {
     });
   }
 
-  async connect(filters?:any) {
-      if(Capacitor.isNativePlatform()) {
-        try {
-          this.device = await this.requestMobileDevice(filters);
-          this.logger.info(`Connecting to device ${this.device.name || this.device.deviceId}...`);
-          await BleClient.connect(this.device.deviceId);
-          this.logger.info(`Connected to device ${this.device.name || this.device.deviceId}`);
+  async connect(filters?: any) {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        this.device = await this.requestMobileDevice(filters);
+        this.logger.info(`Connecting to device ${this.device.name || this.device.deviceId}...`);
+        await BleClient.connect(this.device.deviceId);
+        this.logger.info(`Connected to device ${this.device.name || this.device.deviceId}`);
 
-           await BleClient.startNotifications(
-           this.device.deviceId,
-           this.SERVICE_UUID,
-           this.CHARACTERISTIC_UUID,
-           (value) => {
-             this.notification({ target: { value } });
-           })
+        await BleClient.startNotifications(
+          this.device.deviceId,
+          this.SERVICE_UUID,
+          this.CHARACTERISTIC_UUID,
+          (value) => {
+            this.notification({ target: { value } });
+          })
 
-            this.isConnected = true;
-          } catch (error:any) {
-            this.logger.error(`Connection error: ${error.message}`);
-            this.isConnected = false;
-            await this._disconnected();
-            throw error;
-        }
-      }else{
-        try{
-          this.device = await this.requestBrowserDevice(filters);
-          this.device.addEventListener(
-            'gattserverdisconnected',
-            this._handleDisconnect.bind(this)
-          );
-          this.logger.info(`Connecting to device ${this.device.name || this.device.deviceId}...`);
-
-          const server = await this.device.gatt.connect();
-          this.logger.info('Server connected.');
-          this.service = await server.getPrimaryService(this.SERVICE_UUID);
-
-          this.serviceDVB = await this.device.gatt.getPrimaryService(this.DVB_SERVICE_UUID);
-          this.serviceInfo = await this.device.gatt.getPrimaryService(this.DEVICE_INFORMATION_SERVICE_UUID);
-          this.isConnected = true;
-          await this.setDeviceInfo();
-
-          this.characteristic = await this.service.getCharacteristic(this.CHARACTERISTIC_UUID);
-          this.characteristic.addEventListener(
-            'characteristicvaluechanged',
-            this.notification.bind(this)
-          );
-          await this.characteristic.startNotifications();
-
-        }catch(error:any){
-          this.logger.error(`Connection error: ${error.message}`);
-          this.isConnected = false;
-          await this._disconnected();
-          throw error;
-        }
+        this.isConnected = true;
+      } catch (error: any) {
+        this.logger.error(`Connection error: ${error.message}`);
+        this.isConnected = false;
+        await this._disconnected();
+        throw error;
       }
+    } else {
+      try {
+        this.device = await this.requestBrowserDevice(filters);
+        this.device.addEventListener(
+          'gattserverdisconnected',
+          this._handleDisconnect.bind(this)
+        );
+        this.logger.info(`Connecting to device ${this.device.name || this.device.deviceId}...`);
 
-      if (this.connectingCallback) this.connectingCallback();
+        const server = await this.device.gatt.connect();
+        this.logger.info('Server connected.');
+        this.service = await server.getPrimaryService(this.SERVICE_UUID);
 
-         this.logger.info('Service connected.');
-         this.isConnected = true;
+        this.serviceDVB = await this.device.gatt.getPrimaryService(this.DVB_SERVICE_UUID);
+        this.serviceInfo = await this.device.gatt.getPrimaryService(this.DEVICE_INFORMATION_SERVICE_UUID);
+        this.isConnected = true;
+        await this.setDeviceInfo();
 
-          await this._connected();
+        this.characteristic = await this.service.getCharacteristic(this.CHARACTERISTIC_UUID);
+        this.characteristic.addEventListener(
+          'characteristicvaluechanged',
+          this.notification.bind(this)
+        );
+        await this.characteristic.startNotifications();
 
-          if (this.uploadIsInProgress) {
-            this._uploadNext();
-          }
+      } catch (error: any) {
+        this.logger.error(`Connection error: ${error.message}`);
+        this.isConnected = false;
+        await this._disconnected();
+        throw error;
+      }
+    }
+
+    if (this.connectingCallback) this.connectingCallback();
+
+    this.logger.info('Service connected.');
+    this.isConnected = true;
+
+    await this._connected();
+
+    if (this.uploadIsInProgress) {
+      this._uploadNext();
+    }
   }
 
   getDeviceName() {
@@ -188,12 +188,12 @@ export default class DVBDeviceBLE {
       await this.setHardwareVersion();
       await this.setFirmwareVersion();
       await this.setDUDeviceUID();
-    } catch (error:any) {
+    } catch (error: any) {
       this.logger.error(`Error setting device info: ${error.message}`);
     }
   }
 
-  async _handleDisconnect(event:any) {
+  async _handleDisconnect(event: any) {
     this.logger.info('Device disconnected', event);
     this.isConnected = false;
     if (!this.userRequestedDisconnect) {
@@ -220,7 +220,7 @@ export default class DVBDeviceBLE {
 
     try {
       await this.connect();
-    } catch (error:any) {
+    } catch (error: any) {
       this.logger.error(`Reconnection error: ${error.message}`);
       setTimeout(() => this._reconnect(), 2000);
     }
@@ -235,32 +235,32 @@ export default class DVBDeviceBLE {
     }
   }
 
-  onConnecting(callback:Function) {
+  onConnecting(callback: Function) {
     this.connectingCallback = callback;
     return this;
   }
 
-  onConnect(callback:Function) {
+  onConnect(callback: Function) {
     this.connectCallback = callback;
     return this;
   }
 
-  onDisconnect(callback:Function) {
+  onDisconnect(callback: Function) {
     this.disconnectCallback = callback;
     return this;
   }
 
-  onMessage(callback:Function) {
+  onMessage(callback: Function) {
     this.messageCallback = callback;
     return this;
   }
 
-  onImageUploadProgress(callback:Function) {
+  onImageUploadProgress(callback: Function) {
     this.imageUploadProgressCallback = callback;
     return this;
   }
 
-  onImageUploadFinished(callback:Function) {
+  onImageUploadFinished(callback: Function) {
     this.imageUploadFinishedCallback = callback;
     return this;
   }
@@ -287,9 +287,9 @@ export default class DVBDeviceBLE {
     return this.device && this.device.name;
   }
 
-  async _sendMessage(op:number, group:number, id:number, data?:any) {
+  async _sendMessage(op: number, group: number, id: number, data?: any) {
     const _flags = 0;
-    let encodedData:any = [];
+    let encodedData: any = [];
     if (typeof data !== 'undefined') {
       encodedData = [...new Uint8Array(CBOR.encode(data))];
     }
@@ -314,7 +314,7 @@ export default class DVBDeviceBLE {
     this.seq = (this.seq + 1) % 256;
   }
 
-  private notification(event:any) {
+  private notification(event: any) {
     const message = new Uint8Array(event.target.value.buffer);
     this.buffer = new Uint8Array([...this.buffer, ...message]);
     const messageLength = this.buffer[2] * 256 + this.buffer[3];
@@ -323,7 +323,7 @@ export default class DVBDeviceBLE {
     this.buffer = this.buffer.slice(messageLength + 8);
   }
 
-  _processMessage(message:Uint8Array<ArrayBuffer>) {
+  _processMessage(message: Uint8Array<ArrayBuffer>) {
     const [op, _flags, length_hi, length_lo, group_hi, group_lo, _seq, id] =
       message;
     const data = CBOR.decode(message.slice(8).buffer);
@@ -347,7 +347,7 @@ export default class DVBDeviceBLE {
     return this._sendMessage(2, 0, 5);
   }
 
-  smpEcho(message:any) {
+  smpEcho(message: any) {
     return this._sendMessage(2, 0, 0, { d: message });
   }
 
@@ -359,21 +359,21 @@ export default class DVBDeviceBLE {
     return this._sendMessage(2, 1, 5, {});
   }
 
-  cmdImageTest(hash:any) {
+  cmdImageTest(hash: any) {
     return this._sendMessage(2, 1, 0, {
       hash,
       confirm: false,
     });
   }
 
-  cmdImageConfirm(hash:any) {
+  cmdImageConfirm(hash: any) {
     return this._sendMessage(2, 1, 0, {
       hash,
       confirm: true,
     });
   }
 
-  _hash(image:BufferSource) {
+  _hash(image: BufferSource) {
     return crypto.subtle.digest('SHA-256', image);
   }
 
@@ -385,7 +385,7 @@ export default class DVBDeviceBLE {
     }
 
     const nmpOverhead = 8;
-    const message:any = { data: new Uint8Array(), off: this.uploadOffset };
+    const message: any = { data: new Uint8Array(), off: this.uploadOffset };
     if (this.uploadOffset === 0) {
       message.len = this.uploadImage.byteLength;
       message.sha = new Uint8Array(await this._hash(this.uploadImage));
@@ -407,7 +407,7 @@ export default class DVBDeviceBLE {
     this._sendMessage(2, 1, 1, message);
   }
 
-  async cmdUpload(image:any, slot = 0) {
+  async cmdUpload(image: any, slot = 0) {
     if (this.uploadIsInProgress) {
       this.logger.error('Upload is already in progress.');
       return;
@@ -421,8 +421,8 @@ export default class DVBDeviceBLE {
     this._uploadNext();
   }
 
-  async imageInfo(image:any) {
-    const info:any = {};
+  async imageInfo(image: any) {
+    const info: any = {};
     const view = new Uint8Array(image);
 
     if (view.length < 4096) {
@@ -444,7 +444,7 @@ export default class DVBDeviceBLE {
     return this.shortname;
   }
 
-  async setShortName(shortname?:string) {
+  async setShortName(shortname?: string) {
     try {
       if (Capacitor.isNativePlatform()) {
         if (!shortname) {
@@ -456,7 +456,7 @@ export default class DVBDeviceBLE {
           this.shortname = new TextDecoder().decode(result);
         } else {
           const uf8encode = new TextEncoder();
-          const newShortName:any = uf8encode.encode(shortname);
+          const newShortName: any = uf8encode.encode(shortname);
           await BleClient.write(
             this.device.deviceId,
             this.DVB_SERVICE_UUID,
@@ -499,12 +499,12 @@ export default class DVBDeviceBLE {
     try {
       if (Capacitor.isNativePlatform()) {
         while (true) {
-          const value:any = await BleClient.read(
+          const value: any = await BleClient.read(
             this.device.deviceId,
             this.DVB_SERVICE_UUID,
             this.LIST_FILES_UUID
           );
-          const message:any = new Uint8Array(value);
+          const message: any = new Uint8Array(value);
           if (message.byteLength === 0) return;
           const byteString = String.fromCharCode(...message);
           const split_string = byteString.split(';');
@@ -527,7 +527,7 @@ export default class DVBDeviceBLE {
           this.listOfFiles.push({ name, length });
         }
       }
-    } catch (error:any) {
+    } catch (error: any) {
       this.logger.error(`Error setting file list: ${error.message}`);
     }
   }
@@ -551,16 +551,16 @@ export default class DVBDeviceBLE {
           try {
             const name_bytes: any = utf8encoder.encode(`${name};${offset};`);
             await BleClient.write(
-                this.device.deviceId,
-                this.DVB_SERVICE_UUID,
-                this.WRITE_TOdevice_UUID,
-                name_bytes
+              this.device.deviceId,
+              this.DVB_SERVICE_UUID,
+              this.WRITE_TOdevice_UUID,
+              name_bytes
             );
 
             const display_info: any = await BleClient.read(
-                this.device.deviceId,
-                this.DVB_SERVICE_UUID,
-                this.READ_FROMdevice_UUID
+              this.device.deviceId,
+              this.DVB_SERVICE_UUID,
+              this.READ_FROMdevice_UUID
             );
 
             if (display_info.byteLength !== 0) {
@@ -608,10 +608,8 @@ export default class DVBDeviceBLE {
                 this.logger.info(`Reached 64 KB, updating offset: ${offset}`);
               }
 
-              console.log("totalSize",totalSize)
               if (totalSize > 0 && progressCallback) {
                 const progress = Math.min(100, Math.round((arrayBuffers.length / totalSize) * 100));
-                console.log("progress inside",progress)
                 progressCallback(progress);
               }
 
@@ -748,16 +746,16 @@ export default class DVBDeviceBLE {
     try {
       if (Capacitor.isNativePlatform()) {
         const duDeviceUID = await BleClient.read(
-            this.device.deviceId,
-            this.DVB_SERVICE_UUID,
-            this.DU_DEVICE_UID_UUID
+          this.device.deviceId,
+          this.DVB_SERVICE_UUID,
+          this.DU_DEVICE_UID_UUID
         );
         const duDeviceUIDString = new TextDecoder().decode(duDeviceUID);
         this.logger.info('DUDeviceUID:', duDeviceUIDString);
         this.duDeviceUIDVersion = duDeviceUIDString;
       } else {
         const characteristic = await this.serviceDVB.getCharacteristic(
-            this.DU_DEVICE_UID_UUID
+          this.DU_DEVICE_UID_UUID
         );
         const duDeviceUID = await characteristic.readValue();
         const duDeviceUIDVersion = new TextDecoder().decode(duDeviceUID);
