@@ -40,10 +40,10 @@ export default function Nav() {
                 md:bg-white dark:bg-gray-800
                  md:dark:bg-gray-900 dark:border-gray-700">
             <li>
-              <Link href="/firmware" className={linkClass("/firmware")}>Firmware</Link>
+              <Link href="/transfer" className={linkClass("/transfer")}>Transfer</Link>
             </li>
             <li>
-              <Link href="/transfer" className={linkClass("/transfer")}>Transfer</Link>
+              <Link href="/firmware" className={linkClass("/firmware")}>Firmware</Link>
             </li>
           </ul>
         </div>
