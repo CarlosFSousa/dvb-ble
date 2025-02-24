@@ -14,17 +14,17 @@ export default function Nav() {
   }
 
   const linkClass = (href: string) =>
-    `block py-2 px-3 rounded-sm md:p-0 hover:bg-gray-100 md:hover:bg-transparent md:border-0 ${pathname === href ? "text-blue-700" : "text-gray-900 md:hover:text-blue-700 dark:text-white"
+    `block py-2 px-3 rounded-sm md:p-0 hover:bg-gray-100 md:hover:bg-transparent md:border-0 ${pathname === href ? "text-blue-700" : "text-gray-900 md:hover:text-blue-700 text-white"
     }`;
 
   return (
-    <nav className="bg-white border-gray-200 dark:bg-gray-900">
+    <nav className="bg-gray-900">
       <div className="flex items-center justify-between p-4 mx-auto max-w-screen-xl">
-        <Link href="/" className="text-2xl font-semibold whitespace-nowrap dark:text-white">DVB Ble Scanner v{APP_VERSION}</Link>
+        <Link href="/" className="text-2xl font-semibold whitespace-nowrap text-white">DVB Ble Scanner v{APP_VERSION}</Link>
         <button onClick={toggleMenu}
           data-collapse-toggle="navbar-default"
           type="button"
-          className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
+          className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2  focus:ring-gray-600"
           aria-controls="navbar-default"
           aria-expanded="false">
           <span className="sr-only">Open main menu</span>
@@ -35,10 +35,10 @@ export default function Nav() {
 
         <div className={`${menuOpen ? "block" : "hidden"
           } w-full md:block md:w-auto`} id="navbar-default">
-          <ul className="font-medium flex flex-col p-4 md:p-0 mt-4 border border-gray-100 rounded-lg
-               bg-gray-50 md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0
-                md:bg-white dark:bg-gray-800
-                 md:dark:bg-gray-900 dark:border-gray-700">
+          <ul className="font-medium flex flex-col p-4 md:p-0 mt-4 border  rounded-lg
+                md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0
+                bg-gray-800
+                 md:bg-gray-900 border-gray-700">
             <li>
               <Link href="/transfer" className={linkClass("/transfer")}>Transfer</Link>
             </li>
