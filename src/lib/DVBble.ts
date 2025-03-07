@@ -315,15 +315,16 @@ export default class DVBDeviceBLE {
   }
 
   private notification(event: any) {
+    console.log('message received');
     const message = new Uint8Array(event.target.value.buffer);
     this.buffer = new Uint8Array([...this.buffer, ...message]);
     const messageLength = this.buffer[2] * 256 + this.buffer[3];
     if (this.buffer.length < messageLength + 8) return;
-    this._processMessage(this.buffer.slice(0, messageLength + 8));
+    this.processMessage(this.buffer.slice(0, messageLength + 8));
     this.buffer = this.buffer.slice(messageLength + 8);
   }
 
-  _processMessage(message: Uint8Array<ArrayBuffer>) {
+  private processMessage(message: Uint8Array<ArrayBuffer>) {
     const [op, _flags, length_hi, length_lo, group_hi, group_lo, _seq, id] =
       message;
     const data = CBOR.decode(message.slice(8).buffer);
