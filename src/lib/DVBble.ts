@@ -42,15 +42,15 @@ export default class DVBDeviceBLE {
 
   // Serials
   private DEVICE_INFORMATION_SERVICE_UUID = '0000180a-0000-1000-8000-00805f9b34fb';
-  private SERIAL_NUMBER_UUID = 'dbd00001-ff30-40a5-9ceb-a17358d31999';
+  private SERIAL_NUMBER_UUID = '00002a25-0000-1000-8000-00805f9b34fb';
+  private FIRMWARE_REVISION_UUID = '00002a26-0000-1000-8000-00805f9b34fb';
+  private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';
   private DVB_SERVICE_UUID = 'dbd00001-ff30-40a5-9ceb-a17358d31999';
   private LIST_FILES_UUID = 'dbd00010-ff30-40a5-9ceb-a17358d31999';
   private SHORTNAME_UUID = 'dbd00002-ff30-40a5-9ceb-a17358d31999';
   private WRITE_TOdevice_UUID = 'dbd00011-ff30-40a5-9ceb-a17358d31999';
   private READ_FROMdevice_UUID = 'dbd00012-ff30-40a5-9ceb-a17358d31999';
   private FORMAT_STORAGE_UUID = 'dbd00013-ff30-40a5-9ceb-a17358d31999';
-  private FIRMWARE_REVISION_UUID = '00002a26-0000-1000-8000-00805f9b34fb';
-  private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';
   private DU_DEVICE_UID_UUID = 'dbd00003-ff30-40a5-9ceb-a17358d31999';
 
   private async requestBrowserDevice(filters: any) {
@@ -660,13 +660,13 @@ export default class DVBDeviceBLE {
       if (Capacitor.isNativePlatform()) {
         const serial = await BleClient.read(
           this.device.deviceId,
-          this.DVB_SERVICE_UUID,
+          this.DEVICE_INFORMATION_SERVICE_UUID,
           this.SERIAL_NUMBER_UUID
         );
         const serialNumber = new TextDecoder().decode(serial);
         this.serialNumber = serialNumber;
       } else {
-        const characteristic = await this.serviceDVB.getCharacteristic(
+        const characteristic = await this.serviceInfo.getCharacteristic(
           this.SERIAL_NUMBER_UUID
         );
         const serial = await characteristic.readValue();
