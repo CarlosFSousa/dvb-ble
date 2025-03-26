@@ -1,16 +1,15 @@
-import { BleClient } from '@capacitor-community/bluetooth-le';
-import { Capacitor } from '@capacitor/core';
-import CBOR from 'cbor';
+import { BleClient } from "@capacitor-community/bluetooth-le";
+import { Capacitor } from "@capacitor/core";
+import CBOR from "cbor";
 
 export default class DVBDeviceBLE {
-
   private isConnected = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
 
   // MTU
-  private SERVICE_UUID = '8d53dc1d-1db7-4cd3-868b-8a527460aa84';
-  private CHARACTERISTIC_UUID = 'da2e7828-fbce-4e01-ae9e-261174997c48';
+  private SERVICE_UUID = "8d53dc1d-1db7-4cd3-868b-8a527460aa84";
+  private CHARACTERISTIC_UUID = "da2e7828-fbce-4e01-ae9e-261174997c48";
   private mtu = 140;
   private device: any = null;
   private service: any = null;
@@ -21,15 +20,15 @@ export default class DVBDeviceBLE {
   private messageCallback: any = null;
   private imageUploadProgressCallback: any = null;
   private imageUploadFinishedCallback: any = null;
-  private uploadImage: any = null;
-  private uploadSlot = 0;
-  private uploadOffset = 0;
-  private uploadIsInProgress = false;
   private buffer = new Uint8Array();
   private logger = { info: console.log, error: console.error };
   private seq = 0;
   private userRequestedDisconnect = false;
-
+  
+  public uploadImage: any = null;
+  public uploadOffset = 0;
+  public uploadSlot = 0;
+  public uploadIsInProgress = false;
   // DVB
   private serviceDVB: any = null;
   private serviceInfo: any = null;
@@ -41,17 +40,18 @@ export default class DVBDeviceBLE {
   private duDeviceUIDVersion: any;
 
   // Serials
-  private DEVICE_INFORMATION_SERVICE_UUID = '0000180a-0000-1000-8000-00805f9b34fb';
-  private SERIAL_NUMBER_UUID = '00002a25-0000-1000-8000-00805f9b34fb';
-  private FIRMWARE_REVISION_UUID = '00002a26-0000-1000-8000-00805f9b34fb';
-  private HARDWARE_REVISION_UUID = '00002a27-0000-1000-8000-00805f9b34fb';
-  private DVB_SERVICE_UUID = 'dbd00001-ff30-40a5-9ceb-a17358d31999';
-  private LIST_FILES_UUID = 'dbd00010-ff30-40a5-9ceb-a17358d31999';
-  private SHORTNAME_UUID = 'dbd00002-ff30-40a5-9ceb-a17358d31999';
-  private WRITE_TOdevice_UUID = 'dbd00011-ff30-40a5-9ceb-a17358d31999';
-  private READ_FROMdevice_UUID = 'dbd00012-ff30-40a5-9ceb-a17358d31999';
-  private FORMAT_STORAGE_UUID = 'dbd00013-ff30-40a5-9ceb-a17358d31999';
-  private DU_DEVICE_UID_UUID = 'dbd00003-ff30-40a5-9ceb-a17358d31999';
+  private DEVICE_INFORMATION_SERVICE_UUID =
+    "0000180a-0000-1000-8000-00805f9b34fb";
+  private SERIAL_NUMBER_UUID = "00002a25-0000-1000-8000-00805f9b34fb";
+  private FIRMWARE_REVISION_UUID = "00002a26-0000-1000-8000-00805f9b34fb";
+  private HARDWARE_REVISION_UUID = "00002a27-0000-1000-8000-00805f9b34fb";
+  private DVB_SERVICE_UUID = "dbd00001-ff30-40a5-9ceb-a17358d31999";
+  private LIST_FILES_UUID = "dbd00010-ff30-40a5-9ceb-a17358d31999";
+  private SHORTNAME_UUID = "dbd00002-ff30-40a5-9ceb-a17358d31999";
+  private WRITE_TOdevice_UUID = "dbd00011-ff30-40a5-9ceb-a17358d31999";
+  private READ_FROMdevice_UUID = "dbd00012-ff30-40a5-9ceb-a17358d31999";
+  private FORMAT_STORAGE_UUID = "dbd00013-ff30-40a5-9ceb-a17358d31999";
+  private DU_DEVICE_UID_UUID = "dbd00003-ff30-40a5-9ceb-a17358d31999";
 
   private async requestBrowserDevice(filters: any) {
     const params = {
@@ -61,14 +61,13 @@ export default class DVBDeviceBLE {
         this.DVB_SERVICE_UUID,
         this.DEVICE_INFORMATION_SERVICE_UUID,
       ],
-      filters: filters || [{ namePrefix: 'DVB' }],
+      filters: filters || [{ namePrefix: "DVB" }],
     };
     if (filters) {
       params.filters = filters;
       params.acceptAllDevices = false;
     }
     return navigator.bluetooth.requestDevice(params);
-
   }
 
   private async requestMobileDevice(filters: any) {
@@ -79,7 +78,7 @@ export default class DVBDeviceBLE {
         this.DEVICE_INFORMATION_SERVICE_UUID,
       ],
       allowDuplicates: false,
-      name: '',
+      name: "",
     };
     if (filters && filters.length > 0) {
       params.name = filters[0].name;
@@ -98,18 +97,22 @@ export default class DVBDeviceBLE {
 
       setTimeout(() => {
         BleClient.stopLEScan();
-        reject(new Error('Scan timeout'));
+        reject(new Error("Scan timeout"));
       }, 10000);
     });
   }
 
-  async connect(filters?: any) {
+  async connect(filters?: string[]) {
     if (Capacitor.isNativePlatform()) {
       try {
         this.device = await this.requestMobileDevice(filters);
-        this.logger.info(`Connecting to device ${this.device.name || this.device.deviceId}...`);
+        this.logger.info(
+          `Connecting to device ${this.device.name || this.device.deviceId}...`,
+        );
         await BleClient.connect(this.device.deviceId);
-        this.logger.info(`Connected to device ${this.device.name || this.device.deviceId}`);
+        this.logger.info(
+          `Connected to device ${this.device.name || this.device.deviceId}`,
+        );
 
         await BleClient.startNotifications(
           this.device.deviceId,
@@ -117,7 +120,8 @@ export default class DVBDeviceBLE {
           this.CHARACTERISTIC_UUID,
           (value) => {
             this.notification({ target: { value } });
-          })
+          },
+        );
 
         this.isConnected = true;
       } catch (error: any) {
@@ -130,27 +134,34 @@ export default class DVBDeviceBLE {
       try {
         this.device = await this.requestBrowserDevice(filters);
         this.device.addEventListener(
-          'gattserverdisconnected',
-          this._handleDisconnect.bind(this)
+          "gattserverdisconnected",
+          this._handleDisconnect.bind(this),
         );
-        this.logger.info(`Connecting to device ${this.device.name || this.device.deviceId}...`);
+        this.logger.info(
+          `Connecting to device ${this.device.name || this.device.deviceId}...`,
+        );
 
         const server = await this.device.gatt.connect();
-        this.logger.info('Server connected.');
+        this.logger.info("Server connected.");
         this.service = await server.getPrimaryService(this.SERVICE_UUID);
 
-        this.serviceDVB = await this.device.gatt.getPrimaryService(this.DVB_SERVICE_UUID);
-        this.serviceInfo = await this.device.gatt.getPrimaryService(this.DEVICE_INFORMATION_SERVICE_UUID);
+        this.serviceDVB = await this.device.gatt.getPrimaryService(
+          this.DVB_SERVICE_UUID,
+        );
+        this.serviceInfo = await this.device.gatt.getPrimaryService(
+          this.DEVICE_INFORMATION_SERVICE_UUID,
+        );
         this.isConnected = true;
         await this.setDeviceInfo();
 
-        this.characteristic = await this.service.getCharacteristic(this.CHARACTERISTIC_UUID);
+        this.characteristic = await this.service.getCharacteristic(
+          this.CHARACTERISTIC_UUID,
+        );
         this.characteristic.addEventListener(
-          'characteristicvaluechanged',
-          this.notification.bind(this)
+          "characteristicvaluechanged",
+          this.notification.bind(this),
         );
         await this.characteristic.startNotifications();
-
       } catch (error: any) {
         this.logger.error(`Connection error: ${error.message}`);
         this.isConnected = false;
@@ -161,7 +172,7 @@ export default class DVBDeviceBLE {
 
     if (this.connectingCallback) this.connectingCallback();
 
-    this.logger.info('Service connected.');
+    this.logger.info("Service connected.");
     this.isConnected = true;
 
     await this._connected();
@@ -177,7 +188,7 @@ export default class DVBDeviceBLE {
 
   async setDeviceInfo() {
     if (!this.isConnected) {
-      this.logger.error('Device is not connected. Cannot set device info.');
+      this.logger.error("Device is not connected. Cannot set device info.");
       return;
     }
 
@@ -194,14 +205,14 @@ export default class DVBDeviceBLE {
   }
 
   async _handleDisconnect(event: any) {
-    this.logger.info('Device disconnected', event);
+    this.logger.info("Device disconnected", event);
     this.isConnected = false;
     if (!this.userRequestedDisconnect) {
-      this.logger.info('Attempting to reconnect...');
+      this.logger.info("Attempting to reconnect...");
       this.reconnectAttempts = 0;
       this._reconnect();
     } else {
-      console.log('User requested disconnect');
+      console.log("User requested disconnect");
       await this._disconnected();
     }
   }
@@ -209,7 +220,7 @@ export default class DVBDeviceBLE {
   async _reconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       this.logger.error(
-        'Max reconnection attempts reached. Please try connecting manually.'
+        "Max reconnection attempts reached. Please try connecting manually.",
       );
       await this._disconnected();
       return;
@@ -271,7 +282,7 @@ export default class DVBDeviceBLE {
   }
 
   async _disconnected() {
-    this.logger.info('Disconnected.');
+    this.logger.info("Disconnected.");
     if (this.disconnectCallback) this.disconnectCallback();
     this.device = null;
     this.service = null;
@@ -287,10 +298,10 @@ export default class DVBDeviceBLE {
     return this.device && this.device.name;
   }
 
-  async _sendMessage(op: number, group: number, id: number, data?: any) {
+  private async sendMessage(op: number, group: number, id: number, data?: any) {
     const _flags = 0;
     let encodedData: any = [];
-    if (typeof data !== 'undefined') {
+    if (typeof data !== "undefined") {
       encodedData = [...new Uint8Array(CBOR.encode(data))];
     }
     const length_lo = encodedData.length & 255;
@@ -309,13 +320,13 @@ export default class DVBDeviceBLE {
       ...encodedData,
     ];
     await this.characteristic.writeValueWithoutResponse(
-      Uint8Array.from(message)
+      Uint8Array.from(message),
     );
     this.seq = (this.seq + 1) % 256;
   }
 
   private notification(event: any) {
-    console.log('message received');
+    console.log("message received");
     const message = new Uint8Array(event.target.value.buffer);
     this.buffer = new Uint8Array([...this.buffer, ...message]);
     const messageLength = this.buffer[2] * 256 + this.buffer[3];
@@ -345,37 +356,37 @@ export default class DVBDeviceBLE {
   }
 
   cmdReset() {
-    return this._sendMessage(2, 0, 5);
+    return this.sendMessage(2, 0, 5);
   }
 
   smpEcho(message: any) {
-    return this._sendMessage(2, 0, 0, { d: message });
+    return this.sendMessage(2, 0, 0, { d: message });
   }
 
   cmdImageState() {
-    return this._sendMessage(0, 1, 0);
+    return this.sendMessage(0, 1, 0);
   }
 
   cmdImageErase() {
-    return this._sendMessage(2, 1, 5, {});
+    return this.sendMessage(2, 1, 5, {});
   }
 
   cmdImageTest(hash: any) {
-    return this._sendMessage(2, 1, 0, {
+    return this.sendMessage(2, 1, 0, {
       hash,
       confirm: false,
     });
   }
 
   cmdImageConfirm(hash: any) {
-    return this._sendMessage(2, 1, 0, {
+    return this.sendMessage(2, 1, 0, {
       hash,
       confirm: true,
     });
   }
 
   _hash(image: BufferSource) {
-    return crypto.subtle.digest('SHA-256', image);
+    return crypto.subtle.digest("SHA-256", image);
   }
 
   async _uploadNext() {
@@ -393,24 +404,24 @@ export default class DVBDeviceBLE {
     }
     this.imageUploadProgressCallback({
       percentage: Math.floor(
-        (this.uploadOffset / this.uploadImage.byteLength) * 100
+        (this.uploadOffset / this.uploadImage.byteLength) * 100,
       ),
     });
 
     const length = this.mtu - CBOR.encode(message).byteLength - nmpOverhead;
 
     message.data = new Uint8Array(
-      this.uploadImage.slice(this.uploadOffset, this.uploadOffset + length)
+      this.uploadImage.slice(this.uploadOffset, this.uploadOffset + length),
     );
 
     this.uploadOffset += length;
 
-    this._sendMessage(2, 1, 1, message);
+    this.sendMessage(2, 1, 1, message);
   }
 
   async cmdUpload(image: any, slot = 0) {
     if (this.uploadIsInProgress) {
-      this.logger.error('Upload is already in progress.');
+      this.logger.error("Upload is already in progress.");
       return;
     }
     this.uploadIsInProgress = true;
@@ -427,10 +438,10 @@ export default class DVBDeviceBLE {
     const view = new Uint8Array(image);
 
     if (view.length < 4096) {
-      throw new Error('Image header is too short');
+      throw new Error("Image header is too short");
     }
 
-    const version = [view[12], view[13], view[14], view[15]].join('.');
+    const version = [view[12], view[13], view[14], view[15]].join(".");
     info.version = version;
 
     const hashStart = 20;
@@ -452,7 +463,7 @@ export default class DVBDeviceBLE {
           const result = await BleClient.read(
             this.device.deviceId,
             this.DVB_SERVICE_UUID,
-            this.SHORTNAME_UUID
+            this.SHORTNAME_UUID,
           );
           this.shortname = new TextDecoder().decode(result);
         } else {
@@ -462,20 +473,20 @@ export default class DVBDeviceBLE {
             this.device.deviceId,
             this.DVB_SERVICE_UUID,
             this.SHORTNAME_UUID,
-            newShortName
+            newShortName,
           );
           this.shortname = shortname;
         }
       } else {
         if (!shortname) {
           const characteristic = await this.serviceDVB.getCharacteristic(
-            this.SHORTNAME_UUID
+            this.SHORTNAME_UUID,
           );
           const value = await characteristic.readValue();
           this.shortname = new TextDecoder().decode(value);
         } else {
           const characteristic = await this.serviceDVB.getCharacteristic(
-            this.SHORTNAME_UUID
+            this.SHORTNAME_UUID,
           );
           const uf8encode = new TextEncoder();
           const newShortName = uf8encode.encode(shortname);
@@ -494,7 +505,7 @@ export default class DVBDeviceBLE {
 
   async setFileList() {
     if (!this.isConnected) {
-      this.logger.error('Device is not connected. Cannot set file list.');
+      this.logger.error("Device is not connected. Cannot set file list.");
       return;
     }
     try {
@@ -503,12 +514,12 @@ export default class DVBDeviceBLE {
           const value: any = await BleClient.read(
             this.device.deviceId,
             this.DVB_SERVICE_UUID,
-            this.LIST_FILES_UUID
+            this.LIST_FILES_UUID,
           );
           const message: any = new Uint8Array(value);
           if (message.byteLength === 0) return;
           const byteString = String.fromCharCode(...message);
-          const split_string = byteString.split(';');
+          const split_string = byteString.split(";");
           const name = split_string[0];
           const length = split_string[1];
           this.listOfFiles.push({ name, length });
@@ -516,13 +527,13 @@ export default class DVBDeviceBLE {
       } else {
         while (true) {
           const characteristic = await this.serviceDVB.getCharacteristic(
-            this.LIST_FILES_UUID
+            this.LIST_FILES_UUID,
           );
           const value = await characteristic.readValue();
           const message = new Uint8Array(value.buffer);
           if (message.byteLength === 0) return;
           const byteString = String.fromCharCode(...message);
-          const split_string = byteString.split(';');
+          const split_string = byteString.split(";");
           const name = split_string[0];
           const length = split_string[1];
           this.listOfFiles.push({ name, length });
@@ -555,13 +566,13 @@ export default class DVBDeviceBLE {
               this.device.deviceId,
               this.DVB_SERVICE_UUID,
               this.WRITE_TOdevice_UUID,
-              name_bytes
+              name_bytes,
             );
 
             const display_info: any = await BleClient.read(
               this.device.deviceId,
               this.DVB_SERVICE_UUID,
-              this.READ_FROMdevice_UUID
+              this.READ_FROMdevice_UUID,
             );
 
             if (display_info.byteLength !== 0) {
@@ -574,21 +585,30 @@ export default class DVBDeviceBLE {
               }
 
               if (totalSize > 0 && progressCallback) {
-                const progress = Math.min(100, Math.round((arrayBuffers.length / totalSize) * 100));
+                const progress = Math.min(
+                  100,
+                  Math.round((arrayBuffers.length / totalSize) * 100),
+                );
                 progressCallback(progress);
               }
             } else {
               break;
             }
           } catch (error) {
-            this.logger.error(`Error reading data, retrying at offset ${offset}`, error);
+            this.logger.error(
+              `Error reading data, retrying at offset ${offset}`,
+              error,
+            );
             await new Promise((resolve) => setTimeout(resolve, 500)); // Small delay before retrying
           }
         }
       } else {
-
-        const write_characteristic = await this.serviceDVB.getCharacteristic(this.WRITE_TOdevice_UUID);
-        const read_characteristic = await this.serviceDVB.getCharacteristic(this.READ_FROMdevice_UUID);
+        const write_characteristic = await this.serviceDVB.getCharacteristic(
+          this.WRITE_TOdevice_UUID,
+        );
+        const read_characteristic = await this.serviceDVB.getCharacteristic(
+          this.READ_FROMdevice_UUID,
+        );
 
         while (true) {
           try {
@@ -600,7 +620,6 @@ export default class DVBDeviceBLE {
             const display_info = await read_characteristic.readValue();
 
             if (display_info.byteLength !== 0) {
-
               const array = new Uint8Array(display_info.buffer);
               arrayBuffers.push(...array);
 
@@ -610,15 +629,20 @@ export default class DVBDeviceBLE {
               }
 
               if (totalSize > 0 && progressCallback) {
-                const progress = Math.min(100, Math.round((arrayBuffers.length / totalSize) * 100));
+                const progress = Math.min(
+                  100,
+                  Math.round((arrayBuffers.length / totalSize) * 100),
+                );
                 progressCallback(progress);
               }
-
             } else {
               break;
             }
           } catch (error) {
-            this.logger.error(`Error reading data, retrying at offset ${offset}`, error);
+            this.logger.error(
+              `Error reading data, retrying at offset ${offset}`,
+              error,
+            );
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
@@ -630,22 +654,21 @@ export default class DVBDeviceBLE {
     }
   }
 
-
   async formatStorage() {
     try {
       if (Capacitor.isNativePlatform()) {
         await BleClient.read(
           this.device.deviceId,
           this.DVB_SERVICE_UUID,
-          this.FORMAT_STORAGE_UUID
+          this.FORMAT_STORAGE_UUID,
         );
       } else {
         const characteristic = await this.serviceDVB.getCharacteristic(
-          this.FORMAT_STORAGE_UUID
+          this.FORMAT_STORAGE_UUID,
         );
         await characteristic.readValue();
       }
-      this.logger.info('Files erased');
+      this.logger.info("Files erased");
     } catch (error) {
       this.logger.error(error);
     }
@@ -661,13 +684,13 @@ export default class DVBDeviceBLE {
         const serial = await BleClient.read(
           this.device.deviceId,
           this.DEVICE_INFORMATION_SERVICE_UUID,
-          this.SERIAL_NUMBER_UUID
+          this.SERIAL_NUMBER_UUID,
         );
         const serialNumber = new TextDecoder().decode(serial);
         this.serialNumber = serialNumber;
       } else {
         const characteristic = await this.serviceInfo.getCharacteristic(
-          this.SERIAL_NUMBER_UUID
+          this.SERIAL_NUMBER_UUID,
         );
         const serial = await characteristic.readValue();
         const serialNumber = new TextDecoder().decode(serial);
@@ -689,22 +712,22 @@ export default class DVBDeviceBLE {
         const firmware = await BleClient.read(
           this.device.deviceId,
           this.DEVICE_INFORMATION_SERVICE_UUID,
-          this.FIRMWARE_REVISION_UUID
+          this.FIRMWARE_REVISION_UUID,
         );
         const firmwareVersion = new TextDecoder().decode(firmware);
-        this.logger.info('Firmware Version:', firmwareVersion);
+        this.logger.info("Firmware Version:", firmwareVersion);
         this.firmwareVersion = firmwareVersion;
       } else {
         const characteristic = await this.serviceInfo.getCharacteristic(
-          this.FIRMWARE_REVISION_UUID
+          this.FIRMWARE_REVISION_UUID,
         );
         const firmware = await characteristic.readValue();
         const firmwareVersion = new TextDecoder().decode(firmware);
-        this.logger.info('Firmware Version:', firmwareVersion);
+        this.logger.info("Firmware Version:", firmwareVersion);
         this.firmwareVersion = firmwareVersion;
       }
     } catch (error) {
-      this.logger.error('Error getting firmware version:', error);
+      this.logger.error("Error getting firmware version:", error);
       throw error;
     }
   }
@@ -719,22 +742,22 @@ export default class DVBDeviceBLE {
         const hardware = await BleClient.read(
           this.device.deviceId,
           this.DEVICE_INFORMATION_SERVICE_UUID,
-          this.HARDWARE_REVISION_UUID
+          this.HARDWARE_REVISION_UUID,
         );
         const hardwareVersion = new TextDecoder().decode(hardware);
-        this.logger.info('Hardware Version:', hardwareVersion);
+        this.logger.info("Hardware Version:", hardwareVersion);
         this.hardwareVersion = hardwareVersion;
       } else {
         const characteristic = await this.serviceInfo.getCharacteristic(
-          this.HARDWARE_REVISION_UUID
+          this.HARDWARE_REVISION_UUID,
         );
         const hardware = await characteristic.readValue();
         const hardwareVersion = new TextDecoder().decode(hardware);
-        this.logger.info('Hardware Version:', hardwareVersion);
+        this.logger.info("Hardware Version:", hardwareVersion);
         this.hardwareVersion = hardwareVersion;
       }
     } catch (error) {
-      this.logger.error('Error getting firmware version:', error);
+      this.logger.error("Error getting firmware version:", error);
       throw error;
     }
   }
@@ -749,18 +772,18 @@ export default class DVBDeviceBLE {
         const duDeviceUID = await BleClient.read(
           this.device.deviceId,
           this.DVB_SERVICE_UUID,
-          this.DU_DEVICE_UID_UUID
+          this.DU_DEVICE_UID_UUID,
         );
         const duDeviceUIDString = new TextDecoder().decode(duDeviceUID);
-        this.logger.info('DUDeviceUID:', duDeviceUIDString);
+        this.logger.info("DUDeviceUID:", duDeviceUIDString);
         this.duDeviceUIDVersion = duDeviceUIDString;
       } else {
         const characteristic = await this.serviceDVB.getCharacteristic(
-          this.DU_DEVICE_UID_UUID
+          this.DU_DEVICE_UID_UUID,
         );
         const duDeviceUID = await characteristic.readValue();
         const duDeviceUIDVersion = new TextDecoder().decode(duDeviceUID);
-        this.logger.info('DU Device UID Version:', duDeviceUIDVersion);
+        this.logger.info("DU Device UID Version:", duDeviceUIDVersion);
         this.duDeviceUIDVersion = duDeviceUIDVersion;
       }
     } catch (error) {

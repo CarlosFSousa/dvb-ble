@@ -12,30 +12,36 @@ export default function Nav() {
   const toggleMenu = () => {
     setMenuOpen((prev) => !prev);
   };
+  
+  // Function to close the menu
+  const closeMenu = () => {
+    setMenuOpen(false);
+  };
 
   const linkClass = (href: string) =>
-    `block py-2 px-3 rounded-sm md:p-0 hover:bg-gray-100 md:hover:bg-transparent md:border-0 ${
+    `block py-2 px-3 rounded-sm md:p-0 ${
       pathname === href
-        ? "text-blue-700"
-        : "text-gray-900 md:hover:text-blue-700 text-white"
+        ? "text-blue-400 md:text-blue-400"
+        : "text-white hover:text-gray-300 md:hover:text-blue-400"
     }`;
 
   return (
     <nav className="bg-gray-900">
-      <div className="flex items-center justify-between p-4 mx-auto max-w-screen-xl">
+      <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
         <Link
           href="/"
           className="text-2xl font-semibold whitespace-nowrap text-white"
+          onClick={closeMenu}
         >
           DVB Ble Scanner v{APP_VERSION}
         </Link>
+        
         <button
           onClick={toggleMenu}
-          data-collapse-toggle="navbar-default"
           type="button"
-          className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2  focus:ring-gray-600"
+          className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-400 rounded-lg md:hidden hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
           aria-controls="navbar-default"
-          aria-expanded="false"
+          aria-expanded={menuOpen}
         >
           <span className="sr-only">Open main menu</span>
           <svg
@@ -54,26 +60,21 @@ export default function Nav() {
             />
           </svg>
         </button>
-
-        <div
-          className={`${
-            menuOpen ? "block" : "hidden"
-          } w-full md:block md:w-auto`}
-          id="navbar-default"
-        >
-          <ul
-            className="font-medium flex flex-col p-4 md:p-0 mt-4 border  rounded-lg
-                md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0
-                bg-gray-800
-                 md:bg-gray-900 border-gray-700"
-          >
+        
+        <div className={`${menuOpen ? 'block' : 'hidden'} w-full md:block md:w-auto`} id="navbar-default">
+          <ul className="font-medium flex flex-col p-4 md:p-0 mt-4 rounded-lg bg-gray-800 md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0 md:bg-transparent">
             <li>
-              <Link href="/transfer" className={linkClass("/transfer")}>
+              <Link href="/" className={linkClass("/")} onClick={closeMenu}>
+                Home
+              </Link>
+            </li>
+            <li>
+              <Link href="/transfer" className={linkClass("/transfer")} onClick={closeMenu}>
                 Transfer
               </Link>
             </li>
             <li>
-              <Link href="/firmware" className={linkClass("/firmware")}>
+              <Link href="/firmware" className={linkClass("/firmware")} onClick={closeMenu}>
                 Firmware
               </Link>
             </li>

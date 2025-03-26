@@ -150,36 +150,53 @@ export default function Transfer() {
     }
   }
 
-  return <div className="flex flex-col">
-    <div className="flex flex-col">
-      <h1 className="text-2xl">File Transfer</h1>
-      <button onClick={connectDevice} className={`border-4  border-black p-2 rounded-md bg-slate-800 text-white my-2 w-40 ${buttonLabel === "Disconnect" ? "bg-red-500 border-red-500" : ""}`}>
-        {buttonLabel}
+  return <div className="p-4 max-w-4xl mx-auto">
+  <div className="flex flex-col">
+    <h1 className="text-2xl font-bold mb-4">File Transfer</h1>
+    <button 
+      onClick={connectDevice} 
+      className={`px-4 py-2 rounded-md font-medium mb-4 w-40 ${
+        buttonLabel === "Disconnect" 
+          ? "bg-red-500 hover:bg-red-600 text-white" 
+          : buttonLabel === "Connecting..." 
+            ? "bg-yellow-500 text-white" 
+            : "bg-slate-800 hover:bg-slate-900 text-white"
+      } transition-colors`}
+      disabled={buttonLabel === "Connecting..."}
+    >
+      {buttonLabel}
+    </button>
+    {buttonLabel === "Disconnect" && tableRows.length > 0 ? (
+  <div className="flex flex-col md:flex-row md:justify-between px-2 gap-4 mb-4">
+    <div>
+      <h1 className="text-2xl">{deviceName}</h1>
+      <p>Shortname: {shortname}</p>
+      <p>Serial Number: {serial}</p>
+      <p>DU Device UID: {duDeviceUID}</p>
+      <p>Hardware: {hardware}</p>
+      <p>Firmware: {firmware}</p>
+    </div>
+    <div className="flex flex-col mt-4 md:mt-0">
+      <label className="text-xl mb-1">Change Shortname</label>
+      <input 
+        className="border-2 border-gray-300 p-2 rounded-md mb-2" 
+        placeholder="Enter new shortname"
+        onChange={(e) => setNewShortname(e.target.value)} 
+        onKeyDown={async (e) => {
+          if (e.key === "Enter") {
+            changeShortname(newShortname);
+          }
+        }} 
+      />
+      <button 
+        className="p-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white transition-colors"
+        onClick={formatStorage}
+      >
+        Format Device
       </button>
-      {buttonLabel === "Disconnect" && tableRows.length > 0 ? (
-        <div className="flex justify-between px-2">
-          <div>
-            <h1 className="text-2xl">{deviceName}</h1>
-            <p>Shortname: {shortname}</p>
-            <p>Serial Number: {serial}</p>
-            <p>DU Device UID: {duDeviceUID}</p>
-            <p>Hardware: {hardware}</p>
-            <p>Firmware: {firmware}</p>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-xl">Change Shortname</label>
-            <input className="border-2 border-black p-1 " onChange={(e) => setNewShortname(e.target.value)} onKeyDown={async (e) => {
-              if (e.key === "Enter") {
-                changeShortname(newShortname);
-              }
-            }} />
-            <button className="border-4 p-2 rounded-md bg-yellow-500 text-white mt-2 w-full" onClick={formatStorage}>
-              Format Device
-            </button>
-          </div>
-        </div>
-      ) : null
-      }
+    </div>
+  </div>
+) : null}
     </div>
     <table className="table-auto w-full border-collapse border border-gray-500">
       <thead className="bg-gray-100">
