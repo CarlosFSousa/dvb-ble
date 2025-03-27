@@ -157,8 +157,6 @@ export default function Firmware() {
   return (
     <div className="p-4 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Firmware Management</h1>
-      
-      {/* Connection Button */}
       <button
   onClick={connectDevice}
   className={`px-4 py-2 rounded-md font-medium mb-4 w-40 ${

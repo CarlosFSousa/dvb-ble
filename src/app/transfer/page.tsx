@@ -18,13 +18,14 @@ export default function Transfer() {
   const [duDeviceUID, setDuDeviceUID] = useState("");
   const [firmware, setFirmware] = useState("");
   const [hardware, setHardware] = useState("");
-  const [buttonLabel, setButtonLabel] = useState('Connect');
   const [showModal, setShowModal] = useState(false);
   const [fileName, setFileName] = useState("");
   const [fileData, setFileData] = useState<Uint8Array | any>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [tableRows, setTableRows] = useState<TableRow[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showConnected, setShowConnected] = useState(false);
+  const [showConnecting, setShowConnecting] = useState(false);
   const itemsPerPage = 5;
 
   const indexOfLastRow = currentPage * itemsPerPage;
@@ -45,11 +46,22 @@ export default function Transfer() {
 
   useEffect(() => {
     const handleDisconnect = () => {
-      setButtonLabel('Connect');
+      setShowConnected(false);
+      setShowConnecting(false);
       clearTable();
     }
 
     dvb.onDisconnect(handleDisconnect);
+
+    dvb.onConnecting && dvb.onConnecting(() => {
+      setShowConnecting(true);
+      setShowConnected(false);
+    });
+    
+    dvb.onConnect && dvb.onConnect(() => {
+      setShowConnecting(false);
+      setShowConnected(true);
+    });
 
   }, [dvb]);
 
@@ -58,31 +70,35 @@ export default function Transfer() {
   }, [tableRows]);
 
   const connectDevice = async () => {
-    console.log(buttonLabel)
-    if (buttonLabel === "Connect") {
-      toggleButton();
-      await dvb.connect();
-      setDeviceName(dvb.getDeviceName());
-      setFirmware(dvb.getFirmwareVersion());
-      setHardware(dvb.getHardwareVersion());
-      setShortname(dvb.getShortName());
-      setSerial(dvb.getSerialNumber());
-      setDuDeviceUID(dvb.getDUDeviceUID());
-      await updateTable();
+    if (!showConnected && !showConnecting) {
+      setShowConnecting(true);
+      try {
+        await dvb.connect();
+        await dvb.setDeviceInfo();
+        setDeviceName(dvb.getDeviceName());
+        setFirmware(dvb.getFirmwareVersion());
+        setHardware(dvb.getHardwareVersion());
+        setShortname(dvb.getShortName());
+        setSerial(dvb.getSerialNumber());
+        setDuDeviceUID(dvb.getDUDeviceUID());
+        await updateTable();
+      } catch (error) {
+        console.error('Connection error:', error);
+        setShowConnecting(false);
+      }
     } else {
-      toggleButton();
-      await dvb.disconnect();
-      clearTable();
+      try {
+        await dvb.disconnect();
+        clearTable();
+      } catch (error) {
+        console.error('Disconnection error:', error);
+      }
     }
   }
 
   const clearTable = () => {
     setTableRows([]);
   };
-
-  const toggleButton = () => {
-    setButtonLabel(buttonLabel === "Connect" ? "Disconnect" : "Connect");
-  }
 
   const updateTable = async () => {
 
@@ -154,19 +170,23 @@ export default function Transfer() {
   <div className="flex flex-col">
     <h1 className="text-2xl font-bold mb-4">File Transfer</h1>
     <button 
-      onClick={connectDevice} 
-      className={`px-4 py-2 rounded-md font-medium mb-4 w-40 ${
-        buttonLabel === "Disconnect" 
-          ? "bg-red-500 hover:bg-red-600 text-white" 
-          : buttonLabel === "Connecting..." 
-            ? "bg-yellow-500 text-white" 
-            : "bg-slate-800 hover:bg-slate-900 text-white"
-      } transition-colors`}
-      disabled={buttonLabel === "Connecting..."}
-    >
-      {buttonLabel}
-    </button>
-    {buttonLabel === "Disconnect" && tableRows.length > 0 ? (
+  onClick={connectDevice} 
+  className={`px-4 py-2 rounded-md font-medium mb-4 w-40 ${
+    showConnected
+      ? "bg-red-500 hover:bg-red-600 text-white" 
+      : showConnecting
+        ? "bg-yellow-500 text-white" 
+        : "bg-slate-800 hover:bg-slate-900 text-white"
+  } transition-colors`}
+  disabled={showConnecting}
+>
+  {showConnected
+    ? "Disconnect"
+    : showConnecting
+      ? "Connecting..."
+      : "Connect"}
+</button>
+    {showConnected && tableRows.length > 0 ? (
   <div className="flex flex-col md:flex-row md:justify-between px-2 gap-4 mb-4">
     <div>
       <h1 className="text-2xl">{deviceName}</h1>
