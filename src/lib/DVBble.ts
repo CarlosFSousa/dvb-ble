@@ -2,10 +2,6 @@ import { BleClient } from "@capacitor-community/bluetooth-le";
 import { Capacitor } from "@capacitor/core";
 import CBOR from "cbor";
 
-interface Filter {
-  name: string;
-}
-
 export default class DVBDeviceBLE {
   private isConnected = false;
   private reconnectAttempts = 0;
@@ -59,7 +55,7 @@ export default class DVBDeviceBLE {
   private FORMAT_STORAGE_UUID = "dbd00013-ff30-40a5-9ceb-a17358d31999";
   private DU_DEVICE_UID_UUID = "dbd00003-ff30-40a5-9ceb-a17358d31999";
 
-  private async requestBrowserDevice(filters: string[]) {
+  private async requestBrowserDevice() {
     const params = {
       acceptAllDevices: false,
       optionalServices: [
@@ -67,16 +63,12 @@ export default class DVBDeviceBLE {
         this.DVB_SERVICE_UUID,
         this.DEVICE_INFORMATION_SERVICE_UUID,
       ],
-      filters: filters || [{ namePrefix: "DVB" }],
+      filters: [{ namePrefix: "DVB" }],
     };
-    if (filters) {
-      params.filters = filters;
-      params.acceptAllDevices = false;
-    }
     return navigator.bluetooth.requestDevice(params);
   }
 
-  private async requestMobileDevice(filters: Filter[]) {
+  private async requestMobileDevice() {
     const params = {
       services: [
         this.SERVICE_UUID,
@@ -86,9 +78,6 @@ export default class DVBDeviceBLE {
       allowDuplicates: false,
       name: "",
     };
-    if (filters && filters.length > 0) {
-      params.name = filters[0].name;
-    }
 
     return new Promise((resolve, reject) => {
       BleClient.requestLEScan(params, (result) => {
@@ -108,10 +97,10 @@ export default class DVBDeviceBLE {
     });
   }
 
-  public async connect(filters: string[] | Filter[] = []) {
+  public async connect() {
     if (Capacitor.isNativePlatform()) {
       try {
-        this.device = await this.requestMobileDevice(filters);
+        this.device = await this.requestMobileDevice();
         this.logger.info(
           `Connecting to device ${this.device.name || this.device.deviceId}...`,
         );
@@ -138,7 +127,7 @@ export default class DVBDeviceBLE {
       }
     } else {
       try {
-        this.device = await this.requestBrowserDevice(filters);
+        this.device = await this.requestBrowserDevice();
         this.device.addEventListener(
           "gattserverdisconnected",
           this.handleDisconnect.bind(this),
@@ -397,7 +386,7 @@ export default class DVBDeviceBLE {
   private async uploadNext() {
     if (this.uploadOffset >= this.uploadImage.byteLength) {
       this.uploadIsInProgress = false;
-      this.imageUploadFinishedCallback();
+      this.imageUploadFinishedCallback?.();
       return;
     }
 
@@ -407,7 +396,7 @@ export default class DVBDeviceBLE {
       message.len = this.uploadImage.byteLength;
       message.sha = new Uint8Array(await this.hash(this.uploadImage));
     }
-    this.imageUploadProgressCallback({
+    this.imageUploadProgressCallback?.({
       percentage: Math.floor(
         (this.uploadOffset / this.uploadImage.byteLength) * 100,
       ),
