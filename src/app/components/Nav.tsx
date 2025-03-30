@@ -78,6 +78,11 @@ export default function Nav() {
                 Firmware
               </Link>
             </li>
+            <li>
+              <Link href="/production" className={linkClass("/production")} onClick={closeMenu}>
+                Production
+              </Link>
+            </li> 
           </ul>
         </div>
       </div>

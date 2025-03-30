@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import DVBDeviceBLE from "@/lib/DVBble";
 
 interface TableRow {
   name: string;
   length: number;
-  actions: any;
+  actions: React.ReactNode;
 }
 
 export default function Transfer() {
@@ -20,7 +20,7 @@ export default function Transfer() {
   const [hardware, setHardware] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [fileData, setFileData] = useState<Uint8Array | any>(null);
+  const [fileData, setFileData] = useState<Uint8Array | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [tableRows, setTableRows] = useState<TableRow[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,15 +53,19 @@ export default function Transfer() {
 
     dvb.onDisconnect(handleDisconnect);
 
-    dvb.onConnecting && dvb.onConnecting(() => {
-      setShowConnecting(true);
-      setShowConnected(false);
-    });
+    if (dvb.onConnecting) {
+      dvb.onConnecting(() => {
+        setShowConnecting(true);
+        setShowConnected(false);
+      });
+    }
     
-    dvb.onConnect && dvb.onConnect(() => {
-      setShowConnecting(false);
-      setShowConnected(true);
-    });
+    if (dvb.onConnect) {
+      dvb.onConnect(() => {
+        setShowConnecting(false);
+        setShowConnected(true);
+      });
+    }
 
   }, [dvb]);
 
@@ -75,12 +79,12 @@ export default function Transfer() {
       try {
         await dvb.connect();
         await dvb.setDeviceInfo();
-        setDeviceName(dvb.getDeviceName());
-        setFirmware(dvb.getFirmwareVersion());
-        setHardware(dvb.getHardwareVersion());
-        setShortname(dvb.getShortName());
-        setSerial(dvb.getSerialNumber());
-        setDuDeviceUID(dvb.getDUDeviceUID());
+        setDeviceName(dvb.getDeviceName() || "");
+        setFirmware(dvb.getFirmwareVersion() || "");
+        setHardware(dvb.getHardwareVersion() || "");
+        setShortname(dvb.getShortName() || "");
+        setSerial(dvb.getSerialNumber() || "");
+        setDuDeviceUID(dvb.getDUDeviceUID() || "");
         await updateTable();
       } catch (error) {
         console.error('Connection error:', error);
@@ -117,7 +121,7 @@ export default function Transfer() {
         name: file.name,
         length: file.length,
         actions: buttonDownload
-      } as TableRow;
+      };
     })
 
     setTableRows(newRows);
@@ -131,11 +135,13 @@ export default function Transfer() {
     const content = await dvb.getFileContent(name, (progress: number) => {
       setDownloadProgress(progress);
     });
-    setFileData(content);
+    setFileData(content || null);
     setDownloadProgress(100);
   }
 
   const saveFile = (name: string) => {
+    if (!fileData) return;
+    
     const file = new Blob([fileData]);
     const link = document.createElement('a');
     link.href = URL.createObjectURL(file);

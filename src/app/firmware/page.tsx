@@ -3,14 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import DVBDeviceBLE from "@/lib/DVBble";
 
-interface McuMessage {
-  op: number;
-  group: number;
-  id: number;
-  data: any;
-  length: number;
-}
-
 interface McuImage {
   slot: number;
   active: boolean;
@@ -18,12 +10,12 @@ interface McuImage {
   bootable: boolean;
   pending: boolean;
   hash: number[];
+  confirmed: boolean;
 }
 
 interface McuImageInfo {
   version: string;
-  hash: string;
-  imageSize: number;
+  hash: Uint8Array;
 }
 
 export default function Firmware() {
@@ -33,7 +25,7 @@ export default function Firmware() {
   const [images, setImages] = useState<McuImage[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [fileData, setFileData] = useState<ArrayBuffer | null>(null);
-  const [status, setStatus] = useState("Select image file (.img)");
+  const [status, setStatus] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -41,8 +33,8 @@ export default function Firmware() {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
     setFile(selectedFile);
-    setStatus(`Selected: ${selectedFile.name}`);
-
+    console.log(`Selected file: ${selectedFile.name}`);
+    
     const reader = new FileReader();
     reader.readAsArrayBuffer(selectedFile);
     reader.onload = async () => {
@@ -51,11 +43,9 @@ export default function Firmware() {
         setFileData(buf);
         try {
           const info: McuImageInfo = await mcumgrRef.current.imageInfo(buf);
-          setStatus(
-            `Ready to upload (v${info.version}, ${buf.byteLength} bytes)`
-          );
-        } catch (error: any) {
-          setStatus(`ERROR: ${error?.message}`);
+          console.log(`Ready to upload: v${info.version}, ${buf.byteLength} bytes`);
+        } catch (error: unknown) {
+          console.error(error);
         }
       }
     };
@@ -63,18 +53,20 @@ export default function Firmware() {
 
   const handleUpload = async () => {
     if (!file || !fileData) {
-      setStatus("Please select a file first");
+      console.log("No file selected for upload");
       return;
     }
-    
+
     setIsUploading(true);
     setUploadProgress(0);
     setStatus("Starting upload...");
-    
+    console.log("Starting firmware upload...");
+
     try {
-      mcumgrRef.current.cmdUpload(fileData);
-    } catch (error: any) {
-      setStatus(`Upload failed: ${error?.message}`);
+      mcumgrRef.current.cmdUpload(new Uint8Array(fileData));
+    } catch (error: unknown) {
+      console.error(`Upload failed: ${error instanceof Error ? error.message : String(error)}`);
+      setStatus(`Upload failed: ${error instanceof Error ? error.message : String(error)}`);
       setIsUploading(false);
     }
   };
@@ -83,16 +75,18 @@ export default function Firmware() {
     if (!showConnected && !showConnecting) {
       setShowConnecting(true);
       try {
+        console.log("Connecting to device...");
         await mcumgrRef.current.connect();
-      } catch (error: any) {
-        setStatus(`Connection failed: ${error?.message}`);
+      } catch (error: unknown) {
+        console.error(`Connection failed: ${error instanceof Error ? error.message : String(error)}`);
         setShowConnecting(false);
       }
     } else {
       try {
+        console.log("Disconnecting from device...");
         await mcumgrRef.current.disconnect();
-      } catch (error: any) {
-        setStatus(`Disconnect failed: ${error?.message}`);
+      } catch (error: unknown) {
+        console.error(`Disconnect failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   };
@@ -103,40 +97,51 @@ export default function Firmware() {
     mgr.onConnecting(() => {
       setShowConnecting(true);
       setShowConnected(false);
-      setStatus("Connecting to device...");
+      console.log("Connecting to device...");
     });
 
     mgr.onConnect(() => {
       setShowConnecting(false);
       setShowConnected(true);
-      setStatus("Device connected");
+      console.log("Device connected");
       mgr.cmdImageState();
     });
 
     mgr.onDisconnect(() => {
       setShowConnecting(false);
       setShowConnected(false);
-      setStatus("Device disconnected");
+      console.log("Device disconnected");
     });
 
-    mgr.onMessage(({ op, group, id, data, length }: McuMessage) => {
+    mgr.onMessage((message: { op: number; group: number; id: number; data: unknown; length: number }) => {
+      const { op, group, id, data, length } = message;
+      // Type assertion for data since we know the structure based on the context
+      const typedData = data as {
+        r?: string;
+        tasks?: unknown[];
+        images?: McuImage[];
+        rc?: number;
+        off?: number;
+      };
+      
       switch (group) {
         case 0:
-          if (id === 0 && data?.r !== undefined) {
-            setStatus(`Response: ${data.r}`);
-          } else if (id === 2 && data?.tasks) {
-            console.table(data.tasks);
+          if (id === 0 && typedData.r !== undefined) {
+            console.log(`Response received: ${typedData.r}`);
+          } else if (id === 2 && typedData.tasks) {
+            console.table(typedData.tasks);
           }
           break;
         case 1:
-          if (id === 0 && data.images) {
-            setImages(data.images);
-            setStatus("Firmware image information updated");
+          if (id === 0 && typedData.images) {
+            setImages(typedData.images);
+            console.log("Firmware image information updated");
           }
           break;
         default:
           break;
       }
+      console.log(`Received message: ${op} ${group} ${id} ${length}`);
     });
 
     mgr.onImageUploadProgress(({ percentage }: { percentage: number }) => {
@@ -145,7 +150,7 @@ export default function Firmware() {
     });
 
     mgr.onImageUploadFinished(() => {
-      setStatus("Upload complete");
+      console.log("Upload complete");
       setFile(null);
       setFileData(null);
       setUploadProgress(0);
@@ -158,27 +163,26 @@ export default function Firmware() {
     <div className="p-4 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Firmware Management</h1>
       <button
-  onClick={connectDevice}
-  className={`px-4 py-2 rounded-md font-medium mb-4 w-40 ${
-    showConnected
-      ? "bg-red-500 hover:bg-red-600 text-white"
-      : showConnecting
-        ? "bg-yellow-500 text-white"
-        : "bg-slate-800 hover:bg-slate-900 text-white"
-  } transition-colors`}
-  disabled={showConnecting}
->
-  {showConnected
-    ? "Disconnect"
-    : showConnecting
-      ? "Connecting..."
-      : "Connect"}
-</button>
+        onClick={connectDevice}
+        className={`px-4 py-2 rounded-md font-medium mb-4 w-40 ${showConnected
+            ? "bg-red-500 hover:bg-red-600 text-white"
+            : showConnecting
+              ? "bg-yellow-500 text-white"
+              : "bg-slate-800 hover:bg-slate-900 text-white"
+          } transition-colors`}
+        disabled={showConnecting}
+      >
+        {showConnected
+          ? "Disconnect"
+          : showConnecting
+            ? "Connecting..."
+            : "Connect"}
+      </button>
 
       {showConnected && (
         <div className="mt-6 border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
           <h2 className="text-xl font-semibold mb-3">Device Firmware</h2>
-          
+
           {/* Images section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {images.length === 0 ? (
@@ -193,14 +197,14 @@ export default function Firmware() {
                 return (
                   <div
                     key={i}
-                    className={`p-4 rounded-md border ${
-                      image.active
+                    className={`p-4 rounded-md border ${image.active
                         ? "border-green-500 bg-green-50"
                         : "border-gray-300"
-                    }`}
+                      }`}
                   >
                     <h3 className="font-bold text-lg mb-2">
-                      Slot #{image.slot} {image.active ? "(Active)" : "(Standby)"}
+                      Slot #{image.slot}{" "}
+                      {image.active ? "(Active)" : "(Standby)"}
                     </h3>
                     <table className="w-full text-sm">
                       <tbody>
@@ -211,6 +215,10 @@ export default function Firmware() {
                         <tr>
                           <td className="font-medium py-1">Bootable:</td>
                           <td>{image.bootable ? "Yes" : "No"}</td>
+                        </tr>
+                        <tr>
+                          <td className="font-medium py-1">Confirmed:</td>
+                          <td>{image.confirmed ? "Yes" : "No"}</td>
                         </tr>
                         <tr>
                           <td className="font-medium py-1">Pending:</td>
@@ -227,7 +235,7 @@ export default function Firmware() {
               })
             )}
           </div>
-          
+
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 mb-6">
             <button
@@ -247,15 +255,14 @@ export default function Firmware() {
             <button
               onClick={() => {
                 if (images[1] && images[1].pending === false) {
-                  mcumgrRef.current.cmdImageTest(images[1].hash);
-                  setStatus("Image marked for testing on next boot");
+                  mcumgrRef.current.cmdImageTest(new Uint8Array(images[1].hash));
+                  console.log("Image marked for testing on next boot");
                 }
               }}
-              className={`px-3 py-1.5 ${
-                !images[1] || images[1]?.pending
+              className={`px-3 py-1.5 ${!images[1] || images[1]?.pending
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : "bg-blue-100 hover:bg-blue-200 text-blue-800"
-              } rounded-md transition-colors`}
+                } rounded-md transition-colors`}
               disabled={!images[1] || images[1]?.pending}
               title="Mark standby image to be tested on next boot"
             >
@@ -263,8 +270,24 @@ export default function Firmware() {
             </button>
             <button
               onClick={() => {
+                if (images[0] && images[0].confirmed === false) {
+                  mcumgrRef.current.cmdImageConfirm(new Uint8Array(images[0].hash));
+                  console.log("Image confirmed");
+                }
+              }}
+              className={`px-3 py-1.5 ${!images[0] || images[0]?.confirmed
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-green-100 hover:bg-green-200 text-green-800"
+                } rounded-md transition-colors`}
+              disabled={!images[0] || images[0]?.confirmed}
+              title="Confirm active image"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => {
                 mcumgrRef.current.cmdReset();
-                setStatus("Device reset command sent");
+                console.log("Device reset command sent");
               }}
               className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 rounded-md transition-colors"
               title="Reset the device"
@@ -272,45 +295,48 @@ export default function Firmware() {
               Reset Device
             </button>
           </div>
-          
+
           {/* Upload section */}
           <div className="mt-8 border-t pt-4">
             <h2 className="text-xl font-semibold mb-3">Upload New Firmware</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Firmware Image (.img)
+                  Select Firmware Image (.bin)
                 </label>
                 <input
                   type="file"
                   onChange={onSelectFile}
                   className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  accept=".img"
+                  accept=".bin"
                   disabled={isUploading}
                 />
               </div>
-              
-              <div className="text-sm text-gray-600">{status}</div>
-              
+
+              {isUploading ? (
+                <div className="text-sm text-gray-600">{status}</div>
+              ) : null}
+
               {isUploading && (
                 <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div 
+                  <div
                     className="bg-blue-600 h-2.5 rounded-full"
-                    style={{width: `${uploadProgress}%`}}
+                    style={{ width: `${uploadProgress}%` }}
                   ></div>
                 </div>
               )}
-              
+
               <button
                 onClick={handleUpload}
-                className={`px-4 py-2 rounded-md font-medium ${
-                  !fileData || isUploading
+                className={`px-4 py-2 rounded-md font-medium ${!fileData || isUploading
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                     : "bg-blue-500 hover:bg-blue-600 text-white"
-                } transition-colors`}
+                  } transition-colors`}
                 disabled={!fileData || isUploading}
               >
-                {isUploading ? `Uploading (${uploadProgress}%)` : "Upload Firmware"}
+                {isUploading
+                  ? `Uploading (${uploadProgress}%)`
+                  : "Upload Firmware"}
               </button>
             </div>
           </div>
