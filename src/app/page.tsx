@@ -2,10 +2,9 @@ import { APP_VERSION } from "@/version";
 
 export default function Home() {
   return (
-    <div className="">
-
+    <section>
       <h1 className="text-2xl">Welcome to Ble Scanner v{APP_VERSION}</h1>
-      <p>Please select Transfer or Firmware from the navigation bar to begin.</p>
-    </div>
+      <p>Please select Transfer,Firmware or Production from the navigation bar to begin.</p>
+    </section>
   );
 }

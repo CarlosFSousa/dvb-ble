@@ -160,7 +160,7 @@ export default function Firmware() {
   }, []);
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
+    <section>
       <h1 className="text-2xl font-bold mb-4">Firmware Management</h1>
       <button
         onClick={connectDevice}
@@ -342,6 +342,6 @@ export default function Firmware() {
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

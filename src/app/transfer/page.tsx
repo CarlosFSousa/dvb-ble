@@ -106,9 +106,9 @@ export default function Transfer() {
 
   const updateTable = async () => {
 
-    const files = await dvb.getFileList();
-    console.log(files)
-    const newRows = files.map((file: TableRow) => {
+    const files = await dvb.getFileList() as { name: string; length: string; }[];
+    console.log(files);
+    const newRows = files.map((file) => {
       const buttonDownload = (
         <button
           onClick={() => downloadFile(file.name)}
@@ -119,7 +119,7 @@ export default function Transfer() {
       );
       return {
         name: file.name,
-        length: file.length,
+        length: Number(file.length),
         actions: buttonDownload
       };
     })
@@ -172,7 +172,7 @@ export default function Transfer() {
     }
   }
 
-  return <div className="p-4 max-w-4xl mx-auto">
+  return <section>
   <div className="flex flex-col">
     <h1 className="text-2xl font-bold mb-4">File Transfer</h1>
     <button 
@@ -298,5 +298,5 @@ export default function Transfer() {
         </div>
       </div>
     )}
-  </div>
+  </section>
 }
