@@ -61,9 +61,12 @@ export default function Firmware() {
     setUploadProgress(0);
     setStatus("Starting upload...");
     console.log("Starting firmware upload...");
+    console.log(`File size: ${fileData.byteLength} bytes`);
 
     try {
+      console.log("Initiating upload command...");
       mcumgrRef.current.cmdUpload(new Uint8Array(fileData));
+      console.log("Upload command sent successfully");
     } catch (error: unknown) {
       console.error(`Upload failed: ${error instanceof Error ? error.message : String(error)}`);
       setStatus(`Upload failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -115,6 +118,9 @@ export default function Firmware() {
 
     mgr.onMessage((message: { op: number; group: number; id: number; data: unknown; length: number }) => {
       const { op, group, id, data, length } = message;
+      console.log(`Received message - op: ${op}, group: ${group}, id: ${id}, length: ${length}`);
+      console.log("Message data:", data);
+      
       // Type assertion for data since we know the structure based on the context
       const typedData = data as {
         r?: string;
@@ -136,15 +142,18 @@ export default function Firmware() {
           if (id === 0 && typedData.images) {
             setImages(typedData.images);
             console.log("Firmware image information updated");
+            console.table(typedData.images);
+          } else if (id === 1 && typedData.off !== undefined) {
+            console.log(`Upload offset updated: ${typedData.off}`);
           }
           break;
         default:
           break;
       }
-      console.log(`Received message: ${op} ${group} ${id} ${length}`);
     });
 
     mgr.onImageUploadProgress(({ percentage }: { percentage: number }) => {
+      console.log(`Upload progress: ${percentage}%`);
       setUploadProgress(percentage);
       setStatus(`Uploading... ${percentage}%`);
     });
