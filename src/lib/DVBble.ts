@@ -15,7 +15,6 @@ export default class DVBDeviceBLE {
   private device: DeviceType | null = null;
   private service: BluetoothRemoteGATTService | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
-
   private connectCallback: (() => void) | null = null;
   private connectingCallback: (() => void) | null = null;
   private disconnectCallback: (() => void) | null = null;
@@ -41,6 +40,8 @@ export default class DVBDeviceBLE {
   private uploadOffset = 0;
   private uploadSlot = 0;
   private uploadIsInProgress = false;
+  private duSerialNumber: string | null = null;
+  private isRegistered = false;
 
   // DVB
   private serviceDVB: BluetoothRemoteGATTService | null = null;
@@ -65,6 +66,14 @@ export default class DVBDeviceBLE {
   private READ_FROM_DEVICE_UUID = "dbd00012-ff30-40a5-9ceb-a17358d31999";
   private FORMAT_STORAGE_UUID = "dbd00013-ff30-40a5-9ceb-a17358d31999";
   private DU_DEVICE_UID_UUID = "dbd00003-ff30-40a5-9ceb-a17358d31999";
+  private DU_SERIAL_NUMBER_UUID = "dbd00004-ff30-40a5-9ceb-a17358d31999"; // DU Serial Number (Read)
+  private DU_SERVER_REGISTRATION_UUID = "dbd00005-ff30-40a5-9ceb-a17358d31999"; // DU Server registration (Read/Write)
+
+  // When Registration is correct, enable these:
+  private DU_SHORTNAME_UUID = "dbd00006-ff30-40a5-9ceb-a17358d31999"; // ShortName (Read/Write)
+  private DU_MANUFACTURER_SERIAL_UUID = "dbd00007-ff30-40a5-9ceb-a17358d31999"; // DU Manufacturer Serial Number (Read)
+  private DU_SENSOR_SETTING_UUID = "dbd00008-ff30-40a5-9ceb-a17358d31999"; // DU Sensor Setting (Write - for ACCEL and MAGN Calibration)
+
 
   private async requestBrowserDevice() {
     const params = {
@@ -340,10 +349,6 @@ export default class DVBDeviceBLE {
     this.uploadIsInProgress = false;
     this.serialNumber = null;
     this.listOfFiles = [];
-  }
-
-  public getName() {
-    return this.device && this.device.name;
   }
 
   private async sendMessage(op: number, group: number, id: number, data?: unknown) {
@@ -936,6 +941,72 @@ export default class DVBDeviceBLE {
       }
     } catch (error) {
       this.logger.error("Error getting DUDeviceUID", error);
+      throw error;
+    }
+  }
+
+  public async readDUSerialNumber() {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        if (!this.device || !this.isBleDevice(this.device)) {
+          throw new Error("Device not connected or not a BLE device");
+        }
+        const duSerialNumber = await BleClient.read(
+          this.device.deviceId,
+          this.DVB_SERVICE_UUID,
+          this.DU_SERIAL_NUMBER_UUID,
+        );
+        const duSerialNumberString = new TextDecoder().decode(duSerialNumber);
+        this.logger.info("DU Serial Number:", duSerialNumberString);
+        this.duSerialNumber = duSerialNumberString;
+      } else {
+        if (!this.serviceDVB) {
+          throw new Error("DVB service not available");
+        }
+
+        const characteristic = await this.serviceDVB.getCharacteristic(
+          this.DU_SERIAL_NUMBER_UUID,
+        );
+        const duSerialNumber = await characteristic.readValue();
+        const duSerialNumberString = new TextDecoder().decode(duSerialNumber);
+        this.logger.info("DU Serial Number:", duSerialNumberString);
+        this.duSerialNumber = duSerialNumberString;
+      }
+    } catch (error) {
+      this.logger.error("Error getting DU Serial Number", error);
+      throw error;
+    }
+  }
+
+  public async readDUServerRegistration() {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        if (!this.device || !this.isBleDevice(this.device)) {
+          throw new Error("Device not connected or not a BLE device");
+        }
+        const duServerRegistration = await BleClient.read(
+          this.device.deviceId,
+          this.DVB_SERVICE_UUID,
+          this.DU_SERVER_REGISTRATION_UUID,
+        );
+        const duServerRegistrationString = new TextDecoder().decode(duServerRegistration);
+        this.logger.info("DU Server Registration:", duServerRegistrationString);
+        this.isRegistered = true;
+      } else {
+        if (!this.serviceDVB) {
+          throw new Error("DVB service not available");
+        }
+
+        const characteristic = await this.serviceDVB.getCharacteristic(
+          this.DU_SERVER_REGISTRATION_UUID,
+        );
+        const duServerRegistration = await characteristic.readValue();
+        const duServerRegistrationString = new TextDecoder().decode(duServerRegistration);
+        this.logger.info("DU Server Registration:", duServerRegistrationString);
+        this.isRegistered = true;
+      }
+    } catch (error) {
+      this.logger.error("Error getting DU Server Registration", error);
       throw error;
     }
   }
