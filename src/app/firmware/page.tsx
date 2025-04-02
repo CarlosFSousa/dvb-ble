@@ -64,9 +64,19 @@ export default function Firmware() {
     console.log(`File size: ${fileData.byteLength} bytes`);
 
     try {
-      console.log("Initiating upload command...");
-      mcumgrRef.current.cmdUpload(new Uint8Array(fileData));
+      // Upload to slot 1 (standby)
+      console.log("Initiating upload command to slot 1...");
+      await mcumgrRef.current.cmdUpload(new Uint8Array(fileData), 1);
       console.log("Upload command sent successfully");
+      
+      // Wait for upload to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Only erase the standby slot after successful upload
+      console.log("Upload successful, erasing standby slot...");
+      await mcumgrRef.current.cmdImageErase();
+      setStatus("Upload complete, erased standby slot");
+      
     } catch (error: unknown) {
       console.error(`Upload failed: ${error instanceof Error ? error.message : String(error)}`);
       setStatus(`Upload failed: ${error instanceof Error ? error.message : String(error)}`);

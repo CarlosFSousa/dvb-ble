@@ -11,7 +11,7 @@ export default class DVBDeviceBLE {
 
   private SERVICE_UUID = "8d53dc1d-1db7-4cd3-868b-8a527460aa84";
   private CHARACTERISTIC_UUID = "da2e7828-fbce-4e01-ae9e-261174997c48";
-  private mtu = 100;
+  private mtu = 140;
   private device: DeviceType | null = null;
   private service: BluetoothRemoteGATTService | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
@@ -515,52 +515,6 @@ export default class DVBDeviceBLE {
     return crypto.subtle.digest("SHA-256", image);
   }
 
-  public async cmdUpload(image: Uint8Array, slot = 1) {
-    if (this.uploadIsInProgress) {
-      this.logger.error("Upload is already in progress.");
-      return;
-    }
-
-    this.logger.info(`Starting firmware upload to slot ${slot}`);
-    this.uploadIsInProgress = true;
-    this.uploadOffset = 0;
-    this.uploadImage = image;
-    this.uploadSlot = slot;
-
-    try {
-      // First, get the image hash
-      const imageHash = new Uint8Array(await this.hash(image));
-      this.logger.info("Image hash:", Array.from(imageHash).map(b => b.toString(16).padStart(2, '0')).join(' '));
-      
-      // First, send the image upload command
-      this.logger.info("Sending image upload command...");
-      this.logger.info(`Image size: ${image.byteLength} bytes`);
-      this.logger.info(`Target slot: ${slot}`);
-      
-      const uploadCommand = {
-        slot,
-        size: image.byteLength,
-        hash: imageHash
-      };
-      
-      this.logger.info("Upload command data:", uploadCommand);
-      
-      await this.sendMessage(2, 1, 2, uploadCommand);
-      
-      // Wait for the device to process the initial command
-      this.logger.info("Waiting for device to process upload command...");
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Then start sending the actual data chunks
-      this.logger.info("Starting to send image data chunks...");
-      await this.uploadNext();
-    } catch (error) {
-      this.logger.error("Error during upload initialization:", error);
-      this.uploadIsInProgress = false;
-      throw error;
-    }
-  }
-
   private async uploadNext() {
     if (!this.uploadImage) {
       this.logger.info("No image to upload");
@@ -598,27 +552,53 @@ export default class DVBDeviceBLE {
       this.imageUploadProgressCallback({ percentage: progress });
     }
 
-    // Calculate chunk size with more conservative overhead
-    const messageOverhead = CBOR.encode(message).byteLength;
-    const maxChunkSize = this.mtu - messageOverhead - nmpOverhead - 10; // Added extra safety margin
-    const length = Math.min(maxChunkSize, this.uploadImage.byteLength - this.uploadOffset);
-    
+    const length = this.mtu - CBOR.encode(message).byteLength - nmpOverhead;
     message.data = new Uint8Array(
       this.uploadImage.slice(this.uploadOffset, this.uploadOffset + length),
     );
 
     this.logger.info(`Sending chunk at offset ${this.uploadOffset}, length ${message.data.length} bytes`);
-    
+    this.uploadOffset += length;
+
     try {
       await this.sendMessage(2, 1, 1, message);
       this.logger.info("Chunk sent successfully");
-      
-      // Add a small delay between chunks to prevent overwhelming the device
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      this.uploadOffset += length;
     } catch (error) {
       this.logger.error("Error during upload:", error);
+      this.uploadIsInProgress = false;
+      throw error;
+    }
+  }
+
+  public async cmdUpload(image: Uint8Array, slot = 0) {
+    if (this.uploadIsInProgress) {
+      this.logger.error("Upload is already in progress.");
+      return;
+    }
+
+    this.logger.info(`Starting firmware upload to slot ${slot}`);
+    this.uploadIsInProgress = true;
+    this.uploadOffset = 0;
+    this.uploadImage = image;
+    this.uploadSlot = slot;
+
+    try {
+      // First, send the image upload command
+      this.logger.info("Sending image upload command...");
+      await this.sendMessage(2, 1, 2, {
+        slot,
+        size: image.byteLength,
+        hash: new Uint8Array(await this.hash(image))
+      });
+      
+      // Wait a bit for the device to process
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Then start sending the actual data chunks
+      this.logger.info("Starting to send image data chunks...");
+      await this.uploadNext();
+    } catch (error) {
+      this.logger.error("Error during upload initialization:", error);
       this.uploadIsInProgress = false;
       throw error;
     }
