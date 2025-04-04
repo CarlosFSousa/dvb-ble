@@ -12,7 +12,6 @@
     "@capacitor-community/bluetooth-le": "^7.0.0",
     "@capacitor/cli": "^7.0.1",
     "@capacitor/core": "^7.0.1",
-    "cbor": "^10.0.3",
     "next": "15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
