@@ -36,10 +36,9 @@ export default class DVBDeviceBLE {
 
   private uploadImage: Uint8Array | null = null;
   private uploadOffset = 0;
-  private uploadSlot = 0;
   private uploadIsInProgress = false;
+  private uploadSlot = 0;
   private duSerialNumber: string | null = null;
-  private isRegistered = false;
 
   // DVB
   private serviceDVB: BluetoothRemoteGATTService | null = null;
@@ -140,9 +139,6 @@ export default class DVBDeviceBLE {
         this.logger.info(
           `Connected to device ${this.getDeviceDisplayName(this.device)}`,
         );
-
-        // Wait for services to be discovered
-        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         await BleClient.startNotifications(
           this.device.deviceId,
@@ -391,7 +387,7 @@ export default class DVBDeviceBLE {
     return this;
   }
 
-  public onImageUploadProgress(callback) {
+  public onImageUploadProgress(callback: () => void) {
     this.imageUploadProgressCallback = callback;
     return this;
   }
@@ -419,13 +415,12 @@ export default class DVBDeviceBLE {
     this.listOfFiles = [];
   }
 
-  private async sendMessage(op, group, id, data) {
+  private async sendMessage(op, group, id, data?) {
     const _flags = 0;
     let encodedData = [];
     if (typeof data !== 'undefined') {
       encodedData = [...new Uint8Array(CBOR.encode(data))];
     }
-    console.log('ENCONDED DATA', encodedData);
     const length_lo = encodedData.length & 255;
     const length_hi = encodedData.length >> 8;
     const group_lo = group & 255;
@@ -448,7 +443,6 @@ export default class DVBDeviceBLE {
     this.seq = (this.seq + 1) % 256;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private notification(event) {
     // console.log('message received');
     const message = new Uint8Array(event.target.value.buffer);
@@ -461,7 +455,7 @@ export default class DVBDeviceBLE {
     this.buffer = this.buffer.slice(messageLength + 8);
   }
 
-  private processMessage(message) {
+  private processMessage(message: Uint8Array) {
     const [op, _flags, length_hi, length_lo, group_hi, group_lo, _seq, id] =
       message;
     const data = CBOR.decode(message.slice(8).buffer);
@@ -559,10 +553,9 @@ export default class DVBDeviceBLE {
     this.sendMessage(2, 1, 1, message);
   }
 
-  public async imageInfo(image) {
+  public async imageInfo(image:ArrayBuffer) {
     // https://interrupt.memfault.com/blog/mcuboot-overview#mcuboot-image-binaries
 
-    const info = {};
     const view = new Uint8Array(image);
 
     // check header length
@@ -573,16 +566,12 @@ export default class DVBDeviceBLE {
     // parse image version
     const version = [view[12], view[13], view[14], view[15]].join('.');
 
-    info.version = version;
-
     // parse image hash
     const hashStart = 20;
     const hashEnd = hashStart + 32;
     const hash = view.slice(hashStart, hashEnd);
 
-    info.hash = hash;
-
-    return info;
+    return {version,hash};
   }
 
   public getShortName() {

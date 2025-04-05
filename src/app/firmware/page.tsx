@@ -63,7 +63,6 @@ export default function Firmware() {
     setStatus('Starting upload...');
     console.log('Starting firmware upload...');
     console.log(`File size: ${fileData.byteLength} bytes`);
-    debugger;
     await mcumgrRef.current.cmdUpload(fileData);
   };
 
