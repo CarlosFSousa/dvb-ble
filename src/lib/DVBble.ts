@@ -531,9 +531,11 @@ export default class DVBDeviceBLE {
     }
 
     const nmpOverhead = 8;
-    const message = { data: new Uint8Array(), off: this.uploadOffset };
+    const message= { data: new Uint8Array(), off: this.uploadOffset };
     if (this.uploadOffset === 0) {
+      //@ts-ignore
       message.len = this.uploadImage.byteLength;
+      //@ts-ignore
       message.sha = new Uint8Array(await this.hash(this.uploadImage));
     }
     this.imageUploadProgressCallback({
@@ -1159,48 +1161,65 @@ export default class DVBDeviceBLE {
     }
   }
 
-  // private async calculateSHA3Signature(
-  //   serialNumber: string,
-  //   randomValue: Uint8Array,
-  // ): Promise<Uint8Array> {
-  //   // Test key as specified in the documentation
-  //   const dvb_mac_key = new Uint8Array([
-  //     0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
-  //     0xcc, 0xdd, 0xee, 0xff,
-  //   ]);
+  private readonly MAC_KEY = new Uint8Array([
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 77,
+    0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF
+  ]);
 
-  //   // Convert serial number to bytes (96-bit = 12 bytes)
-  //   const serialBytes = new TextEncoder().encode(serialNumber);
+  private async calculateSHA3Signature(serialNumber: string, randomValue: Uint8Array): Promise<Uint8Array> {
+    try {
+      // Convert serial number hex string to bytes if needed
+      let serialBytes: Uint8Array;
+      if (serialNumber.length === 24) { // 96-bit = 24 hex chars
+        serialBytes = new Uint8Array(12); // 96 bits = 12 bytes
+        for (let i = 0; i < 12; i++) {
+          const byteHex = serialNumber.substring(i * 2, i * 2 + 2);
+          serialBytes[i] = parseInt(byteHex, 16);
+        }
+      } else {
+        throw new Error(`Invalid serial number format: ${serialNumber}`);
+      }
+      
+      // Concatenate all bytes for SHA3 calculation
+      const dataToSign = new Uint8Array(32);
+      // First 16 bytes: MAC key
+      dataToSign.set(this.MAC_KEY, 0);
+      // Next 12 bytes: Serial Number
+      dataToSign.set(serialBytes, 16);
+      // Last 4 bytes: Random Value
+      dataToSign.set(randomValue, 28);
+      
+      this.logger.info("Data prepared for signing:", 
+        Array.from(dataToSign).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      
+      // Calculate SHA3-256 hash
+      const hashBuffer = await crypto.subtle.digest('SHA3-256', dataToSign);
+      this.logger.info("converted into sha3-256",hashBuffer);
+      const hashArray = new Uint8Array(hashBuffer);
+      
+      // Return only first 4 bytes of hash as signature
+      return hashArray.slice(0, 4);
+    } catch (error) {
+      this.logger.error("Error calculating SHA3 signature:", error);
+      throw error;
+    }
+  }
 
-  //   // Combine the data as specified in the documentation
-  //   const data = new Uint8Array(34); // 16 + 12 + 4 + 2 bytes
-  //   data.set(dvb_mac_key, 0); // dvb_mac_key[0-15]
-  //   data.set(serialBytes.slice(0, 12), 16); // 96-bit Serial Number [0-11]
-  //   data.set(randomValue, 28); // Random Value [28-31]
-
-  //   // Calculate SHA-256 hash (using SHA-256 as SHA3 is not supported by Web Crypto API)
-  //   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  //   const hashArray = new Uint8Array(hashBuffer);
-
-  //   // Return first 4 bytes as signature
-  //   return hashArray.slice(0, 4);
-  // }
-
-  public async verifyDevice() {
+  public async verifyDevice(): Promise<boolean> {
     try {
       if (!this.isConnected) {
         throw new Error("Device is not connected");
       }
-
+  
       // First read the DU Serial Number
       await this.readDUSerialNumber();
       const serialNumber = this.getDUSerialNumber();
       if (!serialNumber) {
         throw new Error("Failed to read DU Serial Number");
       }
-
+  
       this.logger.info("DU Serial Number for verification:", serialNumber);
-
+  
       // Generate random value (4 bytes)
       const randomValue = new Uint8Array(4);
       crypto.getRandomValues(randomValue);
@@ -1210,7 +1229,7 @@ export default class DVBDeviceBLE {
           .map((b) => b.toString(16).padStart(2, "0"))
           .join(" ")
       );
-
+  
       // Write random value to DU
       if (Capacitor.isNativePlatform()) {
         if (!this.device || !this.isBleDevice(this.device)) {
@@ -1226,28 +1245,29 @@ export default class DVBDeviceBLE {
         if (!this.serviceDVB) {
           throw new Error("DVB service not available");
         }
-
+  
         const characteristic = await this.serviceDVB.getCharacteristic(
           this.DU_SERVER_REGISTRATION_UUID
         );
         if (!characteristic) {
           throw new Error("Server Registration characteristic not found");
         }
-
+  
         if (
           !characteristic.properties.write &&
           !characteristic.properties.writeWithoutResponse
         ) {
           throw new Error("Characteristic does not support writing");
         }
-
+  
         if (characteristic.properties.writeWithoutResponse) {
           await characteristic.writeValueWithoutResponse(randomValue);
         } else {
           await characteristic.writeValue(randomValue);
         }
       }
-
+  
+      // Read back the response signature
       let response;
       if (Capacitor.isNativePlatform()) {
         if (!this.device || !this.isBleDevice(this.device)) {
@@ -1262,36 +1282,50 @@ export default class DVBDeviceBLE {
         if (!this.serviceDVB) {
           throw new Error("DVB service not available");
         }
-
+  
         const characteristic = await this.serviceDVB.getCharacteristic(
           this.DU_SERVER_REGISTRATION_UUID
         );
         response = await characteristic.readValue();
       }
-
-      // Calculate expected signature
-      // const expectedSignature = await this.calculateSHA3Signature(
-      //   serialNumber,
-      //   randomValue
-      // );
-
+  
+      // Calculate expected signature based on document specification
+      const expectedSignature = await this.calculateSHA3Signature(
+        serialNumber,
+        randomValue
+      );
+  
       // Compare signatures
       const responseArray = new Uint8Array(response.buffer);
-
+  
       if (responseArray.length !== 4) {
         this.logger.error(
           `Invalid signature length: ${responseArray.length} (expected 4)`
         );
         return false;
       }
-
+  
       const isVerified = responseArray.every(
         (byte, index) => byte === expectedSignature[index]
       );
-
+  
+      if (isVerified) {
+        this.logger.info("Device verification successful!");
+      } else {
+        this.logger.error("Device verification failed! Signatures don't match.");
+        this.logger.error(
+          "Expected:", 
+          Array.from(expectedSignature).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        );
+        this.logger.error(
+          "Received:", 
+          Array.from(responseArray).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        );
+      }
+  
       return isVerified;
     } catch (error) {
-      this.logger.error("Error during device registration", error);
+      this.logger.error("Error during device verification:", error);
       throw error;
     }
   }

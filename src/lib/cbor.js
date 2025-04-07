@@ -385,10 +385,20 @@ let CBOR;
 
   CBOR = obj;
 
-  if (typeof define === 'function' && define.amd) define('cbor/cbor', obj);
+//   if (typeof define === 'function' && define.amd) define('cbor/cbor', obj);
+//   else if (typeof module !== 'undefined' && module.exports)
+//     module.exports = obj;
+//   else if (!global.CBOR) global.CBOR = obj;
+// })(this);
+
+if (typeof define === 'function' && define.amd) define('cbor/cbor', obj);
   else if (typeof module !== 'undefined' && module.exports)
     module.exports = obj;
-  else if (!global.CBOR) global.CBOR = obj;
-})(this);
+  else if (typeof globalScope !== 'undefined' && !globalScope.CBOR) 
+    globalScope.CBOR = obj;
+  
+})(typeof window !== 'undefined' ? window : 
+   typeof global !== 'undefined' ? global : 
+   typeof self !== 'undefined' ? self : {});
 
 export default CBOR;

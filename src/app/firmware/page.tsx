@@ -38,13 +38,13 @@ export default function Firmware() {
     const reader = new FileReader();
     reader.readAsArrayBuffer(file);
     reader.onload = async () => {
-      setFileData(reader.result);
+      setFileData(reader.result as ArrayBuffer);
       try {
         const info: McuImageInfo = await mcumgrRef.current.imageInfo(
-          reader.result,
+          reader.result as ArrayBuffer,
         );
         console.log(
-          `Ready to upload: v${info.version}, ${reader.result.byteLength} bytes`,
+          `Ready to upload: v${info.version}, ${(reader.result as ArrayBuffer).byteLength} bytes`,
         );
       } catch (error: unknown) {
         console.error(error);
@@ -161,7 +161,7 @@ export default function Firmware() {
         }
       },
     );
-
+    //@ts-ignore
     mgr.onImageUploadProgress(({ percentage }: { percentage: number }) => {
       console.log(`Upload progress: ${percentage}%`);
       setUploadProgress(percentage);
