@@ -11,7 +11,7 @@ export default class DVBDeviceBLE {
 
   private SERVICE_UUID = "8d53dc1d-1db7-4cd3-868b-8a527460aa84";
   private CHARACTERISTIC_UUID = "da2e7828-fbce-4e01-ae9e-261174997c48";
-  private mtu = 140;
+  private mtu = 510;
   private device: DeviceType | null = null;
   private service: BluetoothRemoteGATTService | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
@@ -1162,11 +1162,11 @@ export default class DVBDeviceBLE {
   }
 
   private readonly MAC_KEY = new Uint8Array([
-    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 77,
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
     0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF
   ]);
 
-  private async calculateSHA3Signature(serialNumber: string, randomValue: Uint8Array): Promise<Uint8Array> {
+  private async calculateSHA256Signature(serialNumber: string, randomValue: Uint8Array): Promise<Uint8Array> {
     try {
       // Convert serial number hex string to bytes if needed
       let serialBytes: Uint8Array;
@@ -1180,7 +1180,6 @@ export default class DVBDeviceBLE {
         throw new Error(`Invalid serial number format: ${serialNumber}`);
       }
       
-      // Concatenate all bytes for SHA3 calculation
       const dataToSign = new Uint8Array(32);
       // First 16 bytes: MAC key
       dataToSign.set(this.MAC_KEY, 0);
@@ -1192,15 +1191,15 @@ export default class DVBDeviceBLE {
       this.logger.info("Data prepared for signing:", 
         Array.from(dataToSign).map(b => b.toString(16).padStart(2, '0')).join(' '));
       
-      // Calculate SHA3-256 hash
-      const hashBuffer = await crypto.subtle.digest('SHA3-256', dataToSign);
-      this.logger.info("converted into sha3-256",hashBuffer);
+      // Calculate SHA-256 hash
+      const hashBuffer = await crypto.subtle.digest('SHA-256', dataToSign);
+      this.logger.info("converted into sha-256",hashBuffer);
       const hashArray = new Uint8Array(hashBuffer);
       
       // Return only first 4 bytes of hash as signature
       return hashArray.slice(0, 4);
     } catch (error) {
-      this.logger.error("Error calculating SHA3 signature:", error);
+      this.logger.error("Error calculating SHA signature:", error);
       throw error;
     }
   }
@@ -1220,7 +1219,6 @@ export default class DVBDeviceBLE {
   
       this.logger.info("DU Serial Number for verification:", serialNumber);
   
-      // Generate random value (4 bytes)
       const randomValue = new Uint8Array(4);
       crypto.getRandomValues(randomValue);
       this.logger.info(
@@ -1290,7 +1288,7 @@ export default class DVBDeviceBLE {
       }
   
       // Calculate expected signature based on document specification
-      const expectedSignature = await this.calculateSHA3Signature(
+      const expectedSignature = await this.calculateSHA256Signature(
         serialNumber,
         randomValue
       );

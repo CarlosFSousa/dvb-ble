@@ -259,34 +259,10 @@ export default function Production() {
                         <h2 className="text-xl font-semibold mb-2">Device Information</h2>
                         <p>DU Serial Number: {duSerialNumber}</p>
                         <p>Manufacturer Serial Number: {manufacturerSerial}</p>
-                        <p>Registration Status: {isVerified ? "Registered" : "Not Registered"}</p>
+                        <p>Verification Status: {isVerified ? "Registered" : "Not Registered"}</p>
                     </div>
 
-                    {verificationStatus.status !== 'idle' && (
-                        <div className={`p-4 rounded-lg shadow ${
-                            verificationStatus.status === 'error' 
-                                ? 'bg-red-100 text-red-700' 
-                                : verificationStatus.status === 'completed'
-                                    ? verificationStatus.message.includes('failed') 
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-green-100 text-green-700'
-                                    : 'bg-blue-100 text-blue-700'
-                        }`}>
-                            {verificationStatus.message.replace('verified', 'registered')}
-                        </div>
-                    )}
-
-                    {calibrationStatus.status !== 'idle' && (
-                        <div className={`p-4 rounded-lg shadow ${
-                            calibrationStatus.status === 'error' 
-                                ? 'bg-red-100 text-red-700' 
-                                : calibrationStatus.status === 'completed'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-blue-100 text-blue-700'
-                        }`}>
-                            {calibrationStatus.message}
-                        </div>
-                    )}
+                    
 
                     <div className="bg-white p-4 rounded-lg shadow">
                         <h2 className="text-xl font-semibold mb-2">Board Test</h2>
@@ -313,6 +289,31 @@ export default function Production() {
                             </div>
                         </div>
                     </div>
+                    {verificationStatus.status !== 'idle' && (
+                        <div className={`p-4 rounded-lg shadow ${
+                            verificationStatus.status === 'error' 
+                                ? 'bg-red-100 text-red-700' 
+                                : verificationStatus.status === 'completed'
+                                    ? verificationStatus.message.includes('failed') 
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-green-100 text-green-700'
+                                    : 'bg-blue-100 text-blue-700'
+                        }`}>
+                            {verificationStatus.message.replace('verified', 'registered')}
+                        </div>
+                    )}
+
+                    {calibrationStatus.status !== 'idle' && (
+                        <div className={`p-4 rounded-lg shadow ${
+                            calibrationStatus.status === 'error' 
+                                ? 'bg-red-100 text-red-700' 
+                                : calibrationStatus.status === 'completed'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-blue-100 text-blue-700'
+                        }`}>
+                            {calibrationStatus.message}
+                        </div>
+                    )}
                 </div>
             )}
         </section>

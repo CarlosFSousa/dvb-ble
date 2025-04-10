@@ -114,7 +114,7 @@ export default function Transfer() {
           onClick={() => downloadFile(file.name)}
           className="border-4 border-green-500 p-2 rounded-md bg-green-600 text-white m-2"
         >
-          Download
+          Save
         </button>
       );
       return {
