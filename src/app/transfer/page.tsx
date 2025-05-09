@@ -26,8 +26,8 @@ export default function Transfer() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showConnected, setShowConnected] = useState(false);
   const [showConnecting, setShowConnecting] = useState(false);
+  
   const itemsPerPage = 5;
-
   const indexOfLastRow = currentPage * itemsPerPage;
   const indexOfFirstRow = indexOfLastRow - itemsPerPage;
   const currentRows = tableRows.slice(indexOfFirstRow, indexOfLastRow);
@@ -292,7 +292,7 @@ export default function Transfer() {
           </button>
           {downloadProgress === 100 && (
             <button onClick={() => saveFile(fileName)} className="border p-2 mt-2">
-              Download
+              Save
             </button>
           )}
         </div>

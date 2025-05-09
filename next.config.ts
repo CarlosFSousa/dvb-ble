@@ -6,8 +6,8 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   output: "export",
-  assetPrefix: "/dvbt/",
-  basePath: "/dvbt",
+  // assetPrefix: "/dvbt/",
+  // basePath: "/dvbt",
   trailingSlash: true,
 };
 

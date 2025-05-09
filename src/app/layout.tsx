@@ -13,7 +13,8 @@ export default function RootLayout({
       </head>
       <body>
         <Nav/>
-        <div className="p-4 max-w-4xl mx-auto">
+        {/* <div className="p-4 max-w-4xl mx-auto"> */}
+        <div>
           {children}
         </div>
       </body>

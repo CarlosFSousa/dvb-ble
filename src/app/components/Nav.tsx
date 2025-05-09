@@ -78,6 +78,11 @@ export default function Nav() {
                 Production
               </Link>
             </li> 
+            <li>
+              <Link href="/parser" className={linkClass("/parser")} onClick={closeMenu}>
+                Parser
+              </Link>
+            </li> 
           </ul>
         </div>
       </div>
